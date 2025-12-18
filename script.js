@@ -1,12 +1,60 @@
 /* script.js */
 
 // ==========================================
-// KONFIGURASI
-// ==========================================
-const APP_CONFIG = {
-    // Arahkan ke endpoint Vercel Serverless Function yang kita buat
-    API_URL: "/api/proxy" 
-};
+// api/proxy.js
+export default async function handler(req, res) {
+    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;
+
+    if (!GOOGLE_SCRIPT_URL) {
+        return res.status(500).json({ status: 'error', message: 'GOOGLE_SCRIPT_URL tidak ditemukan di Environment Variables' });
+    }
+
+    try {
+        const method = req.method;
+        
+        // Konfigurasi fetch
+        let options = {
+            method: method,
+            headers: {
+                "Content-Type": "application/json",
+            },
+            redirect: "follow", // PENTING: Ikuti redirect Google (302)
+        };
+
+        if (method === 'POST') {
+            // Pastikan body dikirim sebagai string
+            const bodyData = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+            options.body = bodyData;
+        }
+
+        // Request ke Google
+        const response = await fetch(GOOGLE_SCRIPT_URL, options);
+
+        // Ambil text mentah dulu (karena jika error, Google kirim HTML, bukan JSON)
+        const responseText = await response.text();
+
+        // Coba parse ke JSON
+        try {
+            const data = JSON.parse(responseText);
+            return res.status(200).json(data);
+        } catch (jsonError) {
+            // Jika gagal parse JSON, berarti Google mengirim HTML (biasanya Error Permission)
+            console.error("Bukan JSON:", responseText); // Cek Logs di Vercel Dashboard jika error
+            return res.status(500).json({ 
+                status: 'error', 
+                message: 'Google Script mengembalikan respons yang bukan JSON. Cek permission "Anyone".',
+                raw_response: responseText.substring(0, 200) // Tampilkan potongan error untuk debug
+            });
+        }
+
+    } catch (error) {
+        return res.status(500).json({ 
+            status: 'error', 
+            message: 'Gagal menghubungi Google Script', 
+            error: error.message 
+        });
+    }
+}
 
 // ==========================================
 // 1. STATE MANAGEMENT (Penyimpanan Data Lokal)
