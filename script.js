@@ -1,47 +1,50 @@
-/* script.js - Final Version with Sorting, Avatar & Password Toggle */
+/* script.js - Final Secure Version (JWT + Avatar + Sort + Password Toggle) */
 
 // ==========================================
 // 1. KONFIGURASI
 // ==========================================
 const APP_CONFIG = {
-    API_URL: "/api/proxy"
+    LOGIN_URL: "/api/auth",  // Endpoint khusus untuk Login (Create Session)
+    DATA_URL: "/api/proxy"   // Endpoint data yang dilindungi Token (Verify Session)
 };
 
 // ==========================================
 // 2. STATE MANAGEMENT
 // ==========================================
 const State = {
+    // Ambil Token dan User dari LocalStorage
+    token: localStorage.getItem('ba_token') || null, 
     user: JSON.parse(localStorage.getItem('ba_user_session')) || null,
+    
     allData: [],
     filteredData: [],
-    pagination: {
-        page: 1,
-        limit: 10
-    },
-    // TAMBAHAN: State untuk Sorting
-    sort: {
-        column: 0, // Default sort berdasarkan Tanggal (Index 0)
-        direction: 'desc' // Default terbaru di atas
-    }
+    pagination: { page: 1, limit: 10 },
+    sort: { column: 0, direction: 'desc' } // Default sort: Tanggal Terbaru
 };
 
 // ==========================================
-// 3. AUTH MODULE
+// 3. AUTH MODULE (Login/Logout)
 // ==========================================
 const Auth = {
     async login(username, password) {
         UI.loading(true);
         try {
-            const res = await fetch(APP_CONFIG.API_URL, {
+            // [CREATE SESSION] Request ke /api/auth
+            const res = await fetch(APP_CONFIG.LOGIN_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'login', username, password })
+                body: JSON.stringify({ username, password })
             });
             const result = await res.json();
             
             if (result.status === 'success') {
+                // Simpan Token (Sesi) dan Info User
+                State.token = result.token;
                 State.user = { name: result.user, role: result.role };
+                
+                localStorage.setItem('ba_token', result.token);
                 localStorage.setItem('ba_user_session', JSON.stringify(State.user));
+                
                 UI.init();
             } else {
                 Swal.fire('Login Gagal', result.message, 'error');
@@ -54,46 +57,72 @@ const Auth = {
     },
 
     logout() {
+        // [DESTROY SESSION] Hapus token dari browser
         localStorage.removeItem('ba_user_session');
+        localStorage.removeItem('ba_token'); 
         location.reload();
     }
 };
 
 // ==========================================
-// 4. DATA MODULE
+// 4. DATA MODULE (Fetch/Add/Update)
 // ==========================================
+
+// [VERIFY SESSION HELPER]
+// Fungsi ini menempelkan Token ke setiap request
+async function fetchWithAuth(url, options = {}) {
+    if (!options.headers) options.headers = {};
+    
+    // Tempelkan Token JWT di Header
+    if (State.token) {
+        options.headers['Authorization'] = `Bearer ${State.token}`;
+    }
+    options.headers['Content-Type'] = 'application/json';
+
+    const res = await fetch(url, options);
+    
+    // Jika Server menolak token (401/403), paksa Logout
+    if (res.status === 401 || res.status === 403) {
+        Auth.logout();
+        throw new Error("Sesi kadaluarsa atau tidak valid.");
+    }
+    
+    return res.json();
+}
+
 const Data = {
     async fetchDocuments() {
         try {
-            const res = await fetch(APP_CONFIG.API_URL);
-            const data = await res.json();
+            // Gunakan fetchWithAuth untuk akses data aman
+            const data = await fetchWithAuth(APP_CONFIG.DATA_URL);
             
             if (Array.isArray(data)) {
                 State.allData = data;
-                // Saat awal load, reset filter dan apply default sort (Tanggal Desc)
                 State.filteredData = [...State.allData];
-                Data.applySort(); 
+                Data.applySort(); // Terapkan sorting default
                 UI.renderTable();
             } else {
-                throw new Error(data.message || "Format data salah");
+                throw new Error(data.message || "Gagal memuat data");
             }
         } catch (err) {
             console.error(err);
-            document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Gagal mengambil data.<br><small>${err.message}</small></td></tr>`;
+            // Jangan tampilkan error jika token kosong (karena akan redirect ke login)
+            if (State.token) {
+                document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">${err.message}</td></tr>`;
+            }
         }
     },
 
     async addDocument(num, app, status) {
         UI.loading(true);
         try {
-            const res = await fetch(APP_CONFIG.API_URL, {
+            const result = await fetchWithAuth(APP_CONFIG.DATA_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    action: 'add', prdNumber: num, appName: app, status: status, user: State.user.name 
+                    action: 'add', prdNumber: num, appName: app, status: status 
+                    // Note: 'user' diambil otomatis dari token di server
                 })
             });
-            const result = await res.json();
 
             if (result.status === 'success') {
                 const d = result.data;
@@ -102,7 +131,7 @@ const Data = {
                 document.getElementById('searchInput').value = '';
                 State.filteredData = [...State.allData];
                 
-                // Reset sort ke default (Tanggal Desc) agar data baru terlihat di atas
+                // Reset sort agar data baru terlihat di atas
                 State.sort = { column: 0, direction: 'desc' };
                 Data.applySort();
                 
@@ -127,14 +156,12 @@ const Data = {
 
         UI.loading(true);
         try {
-            const res = await fetch(APP_CONFIG.API_URL, {
+            const result = await fetchWithAuth(APP_CONFIG.DATA_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    action: 'updateStatus', prdCode: prdCode, newStatus: newStatus, user: State.user.name 
+                    action: 'updateStatus', prdCode: prdCode, newStatus: newStatus 
                 })
             });
-            const result = await res.json();
 
             if (result.status === 'success') {
                 const item = State.allData.find(row => row[1] === prdCode);
@@ -154,18 +181,18 @@ const Data = {
     // --- LOGIKA SORTING ---
     applySort() {
         const colIndex = State.sort.column;
-        const direction = State.sort.direction; // 'asc' or 'desc'
+        const direction = State.sort.direction; 
 
         State.filteredData.sort((a, b) => {
             let valA = a[colIndex];
             let valB = b[colIndex];
 
-            // Khusus kolom Tanggal (Index 0)
+            // Kolom Tanggal (Index 0)
             if (colIndex === 0) {
                 valA = new Date(valA).getTime();
                 valB = new Date(valB).getTime();
             } 
-            // Khusus Kolom String (Code, App, User) -> Case Insensitive
+            // Kolom String
             else if (typeof valA === 'string') {
                 valA = valA.toLowerCase();
                 valB = valB.toLowerCase();
@@ -183,32 +210,24 @@ const Data = {
 // ==========================================
 const UI = {
     init() {
-        if (State.user) {
-            // Sembunyikan Login, Tampilkan Dashboard
+        // Cek apakah ada User DAN Token
+        if (State.user && State.token) {
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('dashboardSection').style.display = 'block';
-            
-            // Set User Info & Role Badge
             document.getElementById('userDisplay').innerHTML = `${State.user.name.toUpperCase()} <span class="badge bg-secondary ms-2">${State.user.role.toUpperCase()}</span>`;
             
-            // --- LOGIKA BARU: HIDE/SHOW STATUS INPUT ---
+            // Logic Sembunyikan Input Status untuk Staff
             const statusContainer = document.getElementById('statusInputContainer');
-            const statusInput = document.getElementById('prdStatus');
-            
-            if (State.user.role === 'admin') {
-                // Jika Admin: Tampilkan Input Status
-                statusContainer.style.display = 'block';
-            } else {
-                // Jika Staff: Sembunyikan Input Status
-                statusContainer.style.display = 'none';
-                // Paksa nilai default jadi "On Progress" (atau "Pending" sesuai SOP Anda)
-                statusInput.value = 'On Progress'; 
+            if (statusContainer) {
+                if (State.user.role === 'admin') {
+                    statusContainer.style.display = 'block';
+                } else {
+                    statusContainer.style.display = 'none';
+                    document.getElementById('prdStatus').value = 'On Progress';
+                }
             }
-            // -------------------------------------------
 
-            // Tampilkan Loading di tabel lalu fetch data
             document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div><br><small class="text-muted">Memuat data...</small></td></tr>`;
-            
             Data.fetchDocuments();
         }
     },
@@ -217,50 +236,38 @@ const UI = {
         document.getElementById('loading').style.display = show ? 'flex' : 'none';
     },
 
-    // --- HANDLE SORT CLICK ---
+    // --- SORTING HANDLER ---
     handleSort(columnIndex) {
-        // Jika klik kolom yang sama, balik arah (asc <-> desc)
         if (State.sort.column === columnIndex) {
             State.sort.direction = State.sort.direction === 'asc' ? 'desc' : 'asc';
         } else {
-            // Jika klik kolom baru, default ke asc
             State.sort.column = columnIndex;
             State.sort.direction = 'asc';
         }
-
-        // Jalankan sorting
         Data.applySort();
-        // Render ulang tabel
         UI.renderTable();
     },
 
-    // --- UPDATE ICON SORTING ---
     updateSortIcons() {
-        // Reset semua icon jadi default (fa-sort abu-abu)
         [0, 1, 2, 3].forEach(idx => {
             const icon = document.getElementById(`sort-icon-${idx}`);
-            const th = icon.parentElement; // Element <th>
-            
             if (icon) {
                 icon.className = 'fas fa-sort';
-                th.classList.remove('active');
+                icon.parentElement.classList.remove('active');
             }
         });
-
-        // Update icon kolom yang aktif
         const activeCol = State.sort.column;
         const activeDir = State.sort.direction;
         const activeIcon = document.getElementById(`sort-icon-${activeCol}`);
-        
         if (activeIcon) {
             activeIcon.className = activeDir === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
-            activeIcon.parentElement.classList.add('active'); // Tambah warna biru
+            activeIcon.parentElement.classList.add('active');
         }
     },
 
+    // --- RENDER TABLE ---
     renderTable() {
-        // Update visual icon sorting setiap kali render
-        UI.updateSortIcons();
+        UI.updateSortIcons(); // Update ikon panah sort
 
         const tbody = document.getElementById('tableBody');
         const emptyState = document.getElementById('emptyState');
@@ -278,7 +285,6 @@ const UI = {
         const pageData = State.filteredData.slice(startIndex, endIndex);
 
         pageData.forEach(row => {
-            // [0]Time, [1]Code, [2]App, [3]User, [4]Status
             const [timestamp, code, app, user, status] = row;
             const dateStr = UI.formatDate(timestamp);
             const statusBadge = UI.getStatusBadge(status || 'Pending', code);
@@ -297,6 +303,7 @@ const UI = {
         UI.renderPagination();
     },
 
+    // --- AVATAR & COLOR ---
     getUserAvatarHTML(name) {
         if (!name) return '-';
         const initial = name.charAt(0).toUpperCase();
@@ -311,6 +318,7 @@ const UI = {
         return colors[Math.abs(hash % colors.length)];
     },
 
+    // --- STATUS BADGE ---
     getStatusBadge(status, prdCode) {
         let colorClass = 'bg-secondary';
         if (status === 'On Progress') colorClass = 'bg-primary';
@@ -331,7 +339,9 @@ const UI = {
             inputOptions: { 'On Progress': 'On Progress', 'Pending': 'Pending', 'Done': 'Done' },
             showCancelButton: true,
             confirmButtonText: 'Simpan',
-            cancelButtonText: 'Batal'
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33'
         }).then((result) => {
             if (result.isConfirmed && result.value !== currentStatus) {
                 Data.updateStatus(prdCode, result.value);
@@ -339,6 +349,7 @@ const UI = {
         });
     },
 
+    // --- PAGINATION ---
     renderPagination() {
         const nav = document.getElementById('paginationControls');
         const totalPages = Math.ceil(State.filteredData.length / State.pagination.limit);
@@ -397,6 +408,7 @@ document.getElementById('prdForm').addEventListener('submit', async (e) => {
         document.getElementById('appName').value,
         document.getElementById('prdStatus').value
     );
+
     if (success) {
         modalInstance.hide();
         e.target.reset();
@@ -411,10 +423,7 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
                (row[3] || '').toLowerCase().includes(keyword) ||
                (row[4] || '').toLowerCase().includes(keyword);
     });
-    
-    // PENTING: Terapkan sort yang sedang aktif pada hasil pencarian
     Data.applySort(); 
-    
     State.pagination.page = 1; 
     UI.renderTable();
 });
