@@ -1,4 +1,4 @@
-/* script.js - Final Version */
+/* script.js - Final Version with Password Toggle */
 
 // ==========================================
 // 1. KONFIGURASI
@@ -72,7 +72,6 @@ const Data = {
                 State.filteredData = [...State.allData];
                 UI.renderTable();
             } else {
-                // Jika respons bukan array (misal error object)
                 throw new Error(data.message || "Format data salah");
             }
         } catch (err) {
@@ -99,17 +98,15 @@ const Data = {
 
             if (result.status === 'success') {
                 const d = result.data;
-                // Update optimis ke memori (tambah di paling atas)
                 State.allData.unshift([d.timestamp, d.code, d.appName, d.user, d.status]);
                 
-                // Reset search & filter agar data baru terlihat
                 document.getElementById('searchInput').value = '';
                 State.filteredData = [...State.allData];
                 State.pagination.page = 1;
                 
                 UI.renderTable();
                 Swal.fire('Berhasil', result.message, 'success');
-                return true; // Return true untuk menutup modal
+                return true; 
             } else {
                 Swal.fire('Gagal', result.message, 'error');
                 return false;
@@ -123,7 +120,6 @@ const Data = {
     },
 
     async updateStatus(prdCode, newStatus) {
-        // Double check di frontend: Staff tidak boleh update
         if (State.user.role !== 'admin') return;
 
         UI.loading(true);
@@ -135,14 +131,13 @@ const Data = {
                     action: 'updateStatus', 
                     prdCode: prdCode, 
                     newStatus: newStatus,
-                    role: State.user.role, // Kirim role untuk validasi backend
-                    user: State.user.name  // PENTING: Kirim user untuk Audit Trail
+                    role: State.user.role, 
+                    user: State.user.name 
                 })
             });
             const result = await res.json();
 
             if (result.status === 'success') {
-                // Update data di memori lokal agar tabel berubah tanpa refresh
                 const item = State.allData.find(row => row[1] === prdCode);
                 if (item) item[4] = newStatus;
                 
@@ -165,16 +160,10 @@ const Data = {
 const UI = {
     init() {
         if (State.user) {
-            // Sembunyikan Login, Tampilkan Dashboard
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('dashboardSection').style.display = 'block';
-            
-            // Set User Info & Role Badge
             document.getElementById('userDisplay').innerHTML = `${State.user.name.toUpperCase()} <span class="badge bg-secondary ms-2">${State.user.role.toUpperCase()}</span>`;
-            
-            // Tampilkan Loading di tabel lalu fetch data
             document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div><br><small class="text-muted">Memuat data...</small></td></tr>`;
-            
             Data.fetchDocuments();
         }
     },
@@ -195,17 +184,13 @@ const UI = {
         }
         emptyState.classList.add('d-none');
 
-        // Logic Paginasi
         const startIndex = (State.pagination.page - 1) * State.pagination.limit;
         const endIndex = startIndex + State.pagination.limit;
         const pageData = State.filteredData.slice(startIndex, endIndex);
 
         pageData.forEach(row => {
-            // Struktur Data dari Spreadsheet: [0]Time, [1]Code, [2]App, [3]User, [4]Status
             const [timestamp, code, app, user, status] = row;
             const dateStr = UI.formatDate(timestamp);
-            
-            // Render Badge Status (Admin clickable, Staff plain)
             const statusBadge = UI.getStatusBadge(status || 'Pending', code);
 
             tbody.innerHTML += `
@@ -227,11 +212,9 @@ const UI = {
         else if (status === 'Done') colorClass = 'bg-success';
         else if (status === 'Pending') colorClass = 'bg-warning text-dark';
 
-        // Jika ADMIN, tambah class clickable dan event onclick
         if (State.user && State.user.role === 'admin') {
             return `<span class="badge status-badge ${colorClass} clickable" onclick="UI.promptStatusChange('${prdCode}', '${status}')" title="Klik untuk ubah status">${status}</span>`;
         }
-        // Jika STAFF, badge biasa (tidak bisa diklik)
         return `<span class="badge status-badge ${colorClass}">${status}</span>`;
     },
 
@@ -264,16 +247,12 @@ const UI = {
         if (totalPages <= 1) { nav.innerHTML = ''; return; }
 
         let html = '';
-        // Helper untuk tombol pagination
         const createBtn = (page, text, active = false, disabled = false) => `
             <li class="page-item ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}">
                 <a class="page-link" href="#" onclick="UI.changePage(${page})">${text}</a>
             </li>`;
 
-        // Tombol Previous
         html += createBtn(State.pagination.page - 1, 'Previous', false, State.pagination.page === 1);
-
-        // Tombol Angka
         for (let i = 1; i <= totalPages; i++) {
             if (i === 1 || i === totalPages || (i >= State.pagination.page - 1 && i <= State.pagination.page + 1)) {
                 html += createBtn(i, i, i === State.pagination.page);
@@ -281,8 +260,6 @@ const UI = {
                 html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
             }
         }
-
-        // Tombol Next
         html += createBtn(State.pagination.page + 1, 'Next', false, State.pagination.page === totalPages);
         nav.innerHTML = html;
     },
@@ -303,75 +280,69 @@ const UI = {
 };
 
 // ==========================================
-// 6. EVENT LISTENERS (Menghubungkan HTML ke JS)
+// 6. EVENT LISTENERS
 // ==========================================
 
-// A. Login Form
+// Login
 document.getElementById('loginForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const u = document.getElementById('username').value.trim();
     const p = document.getElementById('password').value;
-    
     if(u && p) Auth.login(u, p);
 });
 
-// B. Add Document Form
+// Add Document
 document.getElementById('prdForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const modalEl = document.getElementById('addModal');
     const modalInstance = bootstrap.Modal.getInstance(modalEl);
     
-    const num = document.getElementById('prdNumber').value;
-    const app = document.getElementById('appName').value;
-    const status = document.getElementById('prdStatus').value;
-
-    // Panggil fungsi Data.addDocument
-    const success = await Data.addDocument(num, app, status);
+    const success = await Data.addDocument(
+        document.getElementById('prdNumber').value,
+        document.getElementById('appName').value,
+        document.getElementById('prdStatus').value
+    );
 
     if (success) {
         modalInstance.hide();
-        e.target.reset(); // Reset form jika berhasil
+        e.target.reset();
     }
 });
 
-// C. Search Input (Realtime Filtering)
+// Search
 document.getElementById('searchInput').addEventListener('input', (e) => {
     const keyword = e.target.value.toLowerCase();
-    
-    // Filter array lokal
     State.filteredData = State.allData.filter(row => {
-        // row[1]=Code, row[2]=App, row[3]=User, row[4]=Status
         return (row[1] || '').toLowerCase().includes(keyword) || 
                (row[2] || '').toLowerCase().includes(keyword) || 
                (row[3] || '').toLowerCase().includes(keyword) ||
                (row[4] || '').toLowerCase().includes(keyword);
     });
-    
-    State.pagination.page = 1; // Reset ke halaman 1 hasil pencarian
+    State.pagination.page = 1; 
     UI.renderTable();
 });
 
 // ==========================================
-// 7. HELPER FUNCTIONS
+// 7. HELPER FUNCTIONS (PASSWORD TOGGLE)
 // ==========================================
 
-// Fungsi Toggle Show/Hide Password
+// Fungsi ini dipanggil dari HTML onclick="togglePasswordVisibility()"
 function togglePasswordVisibility() {
     const passwordInput = document.getElementById('password');
     const toggleIcon = document.getElementById('toggleIcon');
 
     if (passwordInput.type === 'password') {
-        // Ubah jadi Text (Password terlihat)
+        // Ubah jadi Text (Terlihat)
         passwordInput.type = 'text';
         toggleIcon.classList.remove('fa-eye');
-        toggleIcon.classList.add('fa-eye-slash'); // Ikon mata dicoret
+        toggleIcon.classList.add('fa-eye-slash');
         toggleIcon.classList.remove('text-muted');
-        toggleIcon.classList.add('text-primary'); // Ubah warna jadi biru agar terlihat aktif
+        toggleIcon.classList.add('text-primary'); 
     } else {
-        // Ubah jadi Password (Password tersembunyi)
+        // Ubah jadi Password (Tersembunyi)
         passwordInput.type = 'password';
         toggleIcon.classList.remove('fa-eye-slash');
-        toggleIcon.classList.add('fa-eye'); // Ikon mata biasa
+        toggleIcon.classList.add('fa-eye');
         toggleIcon.classList.add('text-muted');
         toggleIcon.classList.remove('text-primary');
     }
@@ -380,5 +351,4 @@ function togglePasswordVisibility() {
 // ==========================================
 // 8. INITIALIZE APP
 // ==========================================
-// Jalankan pengecekan sesi saat file dimuat
 UI.init();
