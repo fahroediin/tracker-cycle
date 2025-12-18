@@ -34,10 +34,21 @@
                     <label class="fw-bold small mb-1">Username</label>
                     <input type="text" id="username" class="form-control" placeholder="username" required>
                 </div>
+                
+                <!-- Input Password dengan Toggle Show/Hide -->
                 <div class="mb-4">
                     <label class="fw-bold small mb-1">Password</label>
-                    <input type="password" id="password" class="form-control" placeholder="••••••" required>
+                    <div class="input-group">
+                        <!-- Input Password -->
+                        <input type="password" id="password" class="form-control border-end-0" placeholder="••••••" required>
+                        
+                        <!-- Tombol Mata (Eye Icon) -->
+                        <span class="input-group-text bg-white border-start-0" style="cursor: pointer;" onclick="togglePasswordVisibility()">
+                            <i id="toggleIcon" class="fas fa-eye text-muted"></i>
+                        </span>
+                    </div>
                 </div>
+
                 <div class="d-grid">
                     <button type="submit" class="btn btn-primary py-2 fw-bold">MASUK</button>
                 </div>
@@ -57,7 +68,7 @@
                 </p>
             </div>
             
-            <!-- Tombol Action: Full Width di HP, Auto di Desktop -->
+            <!-- Tombol Action -->
             <div class="d-flex gap-2 w-100 w-md-auto justify-content-center justify-content-md-end">
                 <button class="btn btn-primary shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#addModal">
                     <i class="fas fa-plus me-2"></i> 
@@ -71,7 +82,7 @@
             </div>
         </div>
 
-        <!-- Search Bar: Full Width di HP -->
+        <!-- Search Bar -->
         <div class="row mb-3 g-2">
             <div class="col-12 col-md-5">
                 <div class="input-group shadow-sm">
@@ -92,7 +103,6 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light">
                         <tr>
-                            <!-- Text nowrap agar header tidak patah di layar kecil -->
                             <th class="ps-4 text-nowrap" width="15%">Kode PRD</th>
                             <th width="35%">Nama Aplikasi / Project</th>
                             <th class="text-nowrap" width="15%">Status</th>
