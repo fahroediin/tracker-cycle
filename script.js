@@ -1,4 +1,4 @@
-/* script.js - Final Version with Password Toggle */
+/* script.js - Final Version with Avatar & Password Toggle */
 
 // ==========================================
 // 1. KONFIGURASI
@@ -98,8 +98,10 @@ const Data = {
 
             if (result.status === 'success') {
                 const d = result.data;
+                // Update optimis ke memori (tambah di paling atas)
                 State.allData.unshift([d.timestamp, d.code, d.appName, d.user, d.status]);
                 
+                // Reset search & filter agar data baru terlihat
                 document.getElementById('searchInput').value = '';
                 State.filteredData = [...State.allData];
                 State.pagination.page = 1;
@@ -120,6 +122,7 @@ const Data = {
     },
 
     async updateStatus(prdCode, newStatus) {
+        // Double check di frontend: Staff tidak boleh update
         if (State.user.role !== 'admin') return;
 
         UI.loading(true);
@@ -132,7 +135,7 @@ const Data = {
                     prdCode: prdCode, 
                     newStatus: newStatus,
                     role: State.user.role, 
-                    user: State.user.name 
+                    user: State.user.name  // PENTING: Kirim user untuk Audit Trail
                 })
             });
             const result = await res.json();
@@ -172,6 +175,7 @@ const UI = {
         document.getElementById('loading').style.display = show ? 'flex' : 'none';
     },
 
+    // --- FUNGSI RENDER TABLE UTAMA ---
     renderTable() {
         const tbody = document.getElementById('tableBody');
         const emptyState = document.getElementById('emptyState');
@@ -189,16 +193,20 @@ const UI = {
         const pageData = State.filteredData.slice(startIndex, endIndex);
 
         pageData.forEach(row => {
+            // [0]Time, [1]Code, [2]App, [3]User, [4]Status
             const [timestamp, code, app, user, status] = row;
             const dateStr = UI.formatDate(timestamp);
             const statusBadge = UI.getStatusBadge(status || 'Pending', code);
+            
+            // Generate Avatar untuk PIC
+            const picHTML = UI.getUserAvatarHTML(user);
 
             tbody.innerHTML += `
                 <tr>
                     <td class="ps-4"><span class="badge bg-light text-primary border badge-prd shadow-sm">${code}</span></td>
                     <td class="fw-bold text-dark">${app}</td>
                     <td>${statusBadge}</td>
-                    <td><span class="badge bg-info bg-opacity-10 text-dark border border-info border-opacity-25 px-2 py-1">${user}</span></td>
+                    <td>${picHTML}</td> <!-- Kolom PIC dengan Avatar -->
                     <td class="text-end pe-4 small text-muted font-monospace">${dateStr}</td>
                 </tr>
             `;
@@ -206,6 +214,37 @@ const UI = {
         UI.renderPagination();
     },
 
+    // --- HELPER: Generate Avatar HTML ---
+    getUserAvatarHTML(name) {
+        if (!name) return '-';
+        const initial = name.charAt(0).toUpperCase();
+        const color = UI.getColorFromName(name);
+
+        return `
+            <div class="d-flex align-items-center">
+                <div class="avatar-circle me-2" style="background-color: ${color};">
+                    ${initial}
+                </div>
+                <span class="pic-name">${name}</span>
+            </div>
+        `;
+    },
+
+    // --- HELPER: Generate Consistent Color ---
+    getColorFromName(name) {
+        const colors = [
+            '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', 
+            '#6610f2', '#fd7e14', '#20c997', '#d63384', '#6f42c1'
+        ];
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) {
+            hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const index = Math.abs(hash % colors.length);
+        return colors[index];
+    },
+
+    // --- HELPER: Status Badge ---
     getStatusBadge(status, prdCode) {
         let colorClass = 'bg-secondary';
         if (status === 'On Progress') colorClass = 'bg-primary';
@@ -332,14 +371,12 @@ function togglePasswordVisibility() {
     const toggleIcon = document.getElementById('toggleIcon');
 
     if (passwordInput.type === 'password') {
-        // Ubah jadi Text (Terlihat)
         passwordInput.type = 'text';
         toggleIcon.classList.remove('fa-eye');
         toggleIcon.classList.add('fa-eye-slash');
         toggleIcon.classList.remove('text-muted');
         toggleIcon.classList.add('text-primary'); 
     } else {
-        // Ubah jadi Password (Tersembunyi)
         passwordInput.type = 'password';
         toggleIcon.classList.remove('fa-eye-slash');
         toggleIcon.classList.add('fa-eye');

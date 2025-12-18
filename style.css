@@ -176,3 +176,27 @@ body {
 .input-group-text {
     transition: all 0.2s;
 }
+
+/* =========================================
+   PIC / AVATAR STYLES
+   ========================================= */
+.avatar-circle {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pic-name {
+    font-weight: 600;
+    color: #344767;
+    font-size: 0.9rem;
+    text-transform: capitalize;
+}
