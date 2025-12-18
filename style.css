@@ -1,0 +1,62 @@
+/* style.css */
+body { 
+    background-color: #f4f6f9; 
+    font-family: 'Inter', sans-serif; 
+}
+
+/* Login Styles */
+.login-container { 
+    min-height: 100vh; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+}
+.login-card { 
+    width: 100%; 
+    max-width: 400px; 
+    border: none; 
+    box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+    border-radius: 15px; 
+}
+
+/* Dashboard Styles */
+.main-container { 
+    display: none; /* Hidden by default */
+}
+.card-custom { 
+    border: none; 
+    border-radius: 12px; 
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05); 
+}
+.badge-prd { 
+    font-size: 0.9em; 
+    padding: 8px 12px; 
+    border-radius: 6px; 
+    letter-spacing: 0.5px; 
+}
+
+/* Status Badge Styles */
+.status-badge { 
+    font-size: 0.75em; 
+    padding: 5px 10px; 
+    border-radius: 20px; 
+    font-weight: 600; 
+    cursor: default;
+}
+/* Hanya admin yang punya kursor pointer */
+.status-badge.clickable { 
+    cursor: pointer; 
+    transition: transform 0.2s; 
+}
+.status-badge.clickable:hover { 
+    transform: scale(1.1); 
+    opacity: 0.9;
+}
+
+/* Loading Overlay */
+.loading-overlay { 
+    position: fixed; top:0; left:0; width:100%; height:100%; 
+    background:rgba(255,255,255,0.9); z-index:9999; 
+    display:none; justify-content:center; align-items:center; 
+    flex-direction: column;
+}
