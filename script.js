@@ -184,10 +184,31 @@ const Data = {
 const UI = {
     init() {
         if (State.user) {
+            // Sembunyikan Login, Tampilkan Dashboard
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('dashboardSection').style.display = 'block';
+            
+            // Set User Info & Role Badge
             document.getElementById('userDisplay').innerHTML = `${State.user.name.toUpperCase()} <span class="badge bg-secondary ms-2">${State.user.role.toUpperCase()}</span>`;
+            
+            // --- LOGIKA BARU: HIDE/SHOW STATUS INPUT ---
+            const statusContainer = document.getElementById('statusInputContainer');
+            const statusInput = document.getElementById('prdStatus');
+            
+            if (State.user.role === 'admin') {
+                // Jika Admin: Tampilkan Input Status
+                statusContainer.style.display = 'block';
+            } else {
+                // Jika Staff: Sembunyikan Input Status
+                statusContainer.style.display = 'none';
+                // Paksa nilai default jadi "On Progress" (atau "Pending" sesuai SOP Anda)
+                statusInput.value = 'On Progress'; 
+            }
+            // -------------------------------------------
+
+            // Tampilkan Loading di tabel lalu fetch data
             document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div><br><small class="text-muted">Memuat data...</small></td></tr>`;
+            
             Data.fetchDocuments();
         }
     },
