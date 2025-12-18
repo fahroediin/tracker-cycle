@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PRD System Tracker</title>
+    <title>Cycle Tracker System</title>
     <!-- Library Eksternal -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -45,22 +45,25 @@
         </div>
     </div>
 
-<!-- Dashboard Section -->
+    <!-- Dashboard Section -->
     <div id="dashboardSection" class="main-container py-4 py-md-5 container">
         
         <!-- Header: Responsive Flex (Column di HP, Row di Desktop) -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
             <div class="text-center text-md-start">
-                <h2 class="fw-bold text-dark mb-1"><i class="fas fa-cubes me-2 text-primary"></i>PRD Tracker</h2>
+                <h2 class="fw-bold text-dark mb-1"><i class="fas fa-cubes me-2 text-primary"></i>Cycle Tracker</h2>
                 <p class="text-muted mb-0 small">
-                    User: <span id="userDisplay" class="fw-bold text-primary"></span>
+                    Login: <span id="userDisplay" class="fw-bold text-primary"></span>
                 </p>
             </div>
             
-            <!-- Tombol Action: Full Width di HP -->
+            <!-- Tombol Action: Full Width di HP, Auto di Desktop -->
             <div class="d-flex gap-2 w-100 w-md-auto justify-content-center justify-content-md-end">
                 <button class="btn btn-primary shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#addModal">
-                    <i class="fas fa-plus me-2"></i> <span class="d-inline d-md-none">Baru</span><span class="d-none d-md-inline">Input Baru</span>
+                    <i class="fas fa-plus me-2"></i> 
+                    <!-- Teks berubah pendek di HP -->
+                    <span class="d-inline d-md-none">Baru</span>
+                    <span class="d-none d-md-inline">Input Baru</span>
                 </button>
                 <button class="btn btn-outline-danger" onclick="Auth.logout()" title="Keluar">
                     <i class="fas fa-sign-out-alt"></i>
@@ -73,12 +76,12 @@
             <div class="col-12 col-md-5">
                 <div class="input-group shadow-sm">
                     <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Cari Kode, App, User...">
+                    <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Cari Kode, Nama, User, Status...">
                 </div>
             </div>
             <div class="col-12 col-md-7 text-center text-md-end align-self-center">
-                 <small class="text-muted fst-italic d-block d-md-inline mt-2 mt-md-0" style="font-size: 0.75rem;">
-                    *Admin: Klik status untuk ubah
+                 <small class="text-muted fst-italic d-block d-md-inline mt-2 mt-md-0" style="font-size: 0.8rem;">
+                    *Admin dapat klik badge status untuk mengubahnya
                  </small>
             </div>
         </div>
@@ -89,11 +92,12 @@
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-4 text-nowrap" width="15%">Kode</th>
-                            <th width="35%">Aplikasi</th> <!-- Lebar diperbesar utk mobile -->
-                            <th width="15%">Status</th>
-                            <th width="15%">User</th>
-                            <th width="20%" class="text-end pe-4 text-nowrap">Tanggal</th>
+                            <!-- Text nowrap agar header tidak patah di layar kecil -->
+                            <th class="ps-4 text-nowrap" width="15%">Kode PRD</th>
+                            <th width="35%">Nama Aplikasi / Project</th>
+                            <th class="text-nowrap" width="15%">Status</th>
+                            <th class="text-nowrap" width="15%">Dibuat Oleh</th>
+                            <th class="text-end pe-4 text-nowrap" width="20%">Tanggal Input</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
@@ -112,6 +116,7 @@
             </div>
         </div>
     </div>
+
     <!-- Modal Input -->
     <div class="modal fade" id="addModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
