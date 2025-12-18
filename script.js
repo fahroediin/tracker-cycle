@@ -1,63 +1,15 @@
-/* script.js */
+/* script.js - Final Version */
 
 // ==========================================
-// api/proxy.js
-export default async function handler(req, res) {
-    const GOOGLE_SCRIPT_URL = process.env.GOOGLE_SCRIPT_URL;
-
-    if (!GOOGLE_SCRIPT_URL) {
-        return res.status(500).json({ status: 'error', message: 'GOOGLE_SCRIPT_URL tidak ditemukan di Environment Variables' });
-    }
-
-    try {
-        const method = req.method;
-        
-        // Konfigurasi fetch
-        let options = {
-            method: method,
-            headers: {
-                "Content-Type": "application/json",
-            },
-            redirect: "follow", // PENTING: Ikuti redirect Google (302)
-        };
-
-        if (method === 'POST') {
-            // Pastikan body dikirim sebagai string
-            const bodyData = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
-            options.body = bodyData;
-        }
-
-        // Request ke Google
-        const response = await fetch(GOOGLE_SCRIPT_URL, options);
-
-        // Ambil text mentah dulu (karena jika error, Google kirim HTML, bukan JSON)
-        const responseText = await response.text();
-
-        // Coba parse ke JSON
-        try {
-            const data = JSON.parse(responseText);
-            return res.status(200).json(data);
-        } catch (jsonError) {
-            // Jika gagal parse JSON, berarti Google mengirim HTML (biasanya Error Permission)
-            console.error("Bukan JSON:", responseText); // Cek Logs di Vercel Dashboard jika error
-            return res.status(500).json({ 
-                status: 'error', 
-                message: 'Google Script mengembalikan respons yang bukan JSON. Cek permission "Anyone".',
-                raw_response: responseText.substring(0, 200) // Tampilkan potongan error untuk debug
-            });
-        }
-
-    } catch (error) {
-        return res.status(500).json({ 
-            status: 'error', 
-            message: 'Gagal menghubungi Google Script', 
-            error: error.message 
-        });
-    }
-}
+// 1. KONFIGURASI
+// ==========================================
+const APP_CONFIG = {
+    // Menggunakan Proxy Vercel agar URL Google Script aman/tersembunyi
+    API_URL: "/api/proxy"
+};
 
 // ==========================================
-// 1. STATE MANAGEMENT (Penyimpanan Data Lokal)
+// 2. STATE MANAGEMENT (Penyimpanan Data Lokal)
 // ==========================================
 const State = {
     user: JSON.parse(localStorage.getItem('ba_user_session')) || null, // Simpan Nama & Role
@@ -70,7 +22,7 @@ const State = {
 };
 
 // ==========================================
-// 2. AUTH MODULE (Login/Logout)
+// 3. AUTH MODULE (Login/Logout)
 // ==========================================
 const Auth = {
     async login(username, password) {
@@ -78,12 +30,13 @@ const Auth = {
         try {
             const res = await fetch(APP_CONFIG.API_URL, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'login', username, password })
             });
             const result = await res.json();
             
             if (result.status === 'success') {
-                // Simpan user & role
+                // Simpan user & role ke localStorage
                 State.user = { name: result.user, role: result.role };
                 localStorage.setItem('ba_user_session', JSON.stringify(State.user));
                 UI.init();
@@ -91,7 +44,8 @@ const Auth = {
                 Swal.fire('Login Gagal', result.message, 'error');
             }
         } catch (err) {
-            Swal.fire('Error', 'Gagal terhubung ke server', 'error');
+            console.error(err);
+            Swal.fire('Error', 'Gagal terhubung ke server (Cek Proxy/Internet)', 'error');
         }
         UI.loading(false);
     },
@@ -103,19 +57,27 @@ const Auth = {
 };
 
 // ==========================================
-// 3. DATA MODULE (Fetch/Add/Update)
+// 4. DATA MODULE (Fetch/Add/Update)
 // ==========================================
 const Data = {
     async fetchDocuments() {
         try {
+            // Fetch GET ke Proxy
             const res = await fetch(APP_CONFIG.API_URL);
             const data = await res.json();
-            State.allData = data || [];
-            State.filteredData = [...State.allData];
-            UI.renderTable();
+            
+            // Validasi data
+            if (Array.isArray(data)) {
+                State.allData = data;
+                State.filteredData = [...State.allData];
+                UI.renderTable();
+            } else {
+                // Jika respons bukan array (misal error object)
+                throw new Error(data.message || "Format data salah");
+            }
         } catch (err) {
             console.error(err);
-            document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Gagal mengambil data.</td></tr>`;
+            document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Gagal mengambil data. <br><small>${err.message}</small></td></tr>`;
         }
     },
 
@@ -124,6 +86,7 @@ const Data = {
         try {
             const res = await fetch(APP_CONFIG.API_URL, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     action: 'add', 
                     prdNumber: num, 
@@ -136,17 +99,17 @@ const Data = {
 
             if (result.status === 'success') {
                 const d = result.data;
-                // Update optimis ke memori
+                // Update optimis ke memori (tambah di paling atas)
                 State.allData.unshift([d.timestamp, d.code, d.appName, d.user, d.status]);
                 
-                // Reset search & filter
+                // Reset search & filter agar data baru terlihat
                 document.getElementById('searchInput').value = '';
                 State.filteredData = [...State.allData];
                 State.pagination.page = 1;
                 
                 UI.renderTable();
                 Swal.fire('Berhasil', result.message, 'success');
-                return true; // Sinyal sukses untuk tutup modal
+                return true; // Return true untuk menutup modal
             } else {
                 Swal.fire('Gagal', result.message, 'error');
                 return false;
@@ -160,24 +123,26 @@ const Data = {
     },
 
     async updateStatus(prdCode, newStatus) {
-        if (State.user.role !== 'admin') return; 
+        // Double check di frontend: Staff tidak boleh update
+        if (State.user.role !== 'admin') return;
 
         UI.loading(true);
         try {
             const res = await fetch(APP_CONFIG.API_URL, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     action: 'updateStatus', 
                     prdCode: prdCode, 
                     newStatus: newStatus,
-                    role: State.user.role,
-                    user: State.user.name // <--- TAMBAHAN: Kirim Nama User untuk Audit Trail
+                    role: State.user.role, // Kirim role untuk validasi backend
+                    user: State.user.name  // PENTING: Kirim user untuk Audit Trail
                 })
             });
             const result = await res.json();
 
             if (result.status === 'success') {
-                // Update lokal
+                // Update data di memori lokal agar tabel berubah tanpa refresh
                 const item = State.allData.find(row => row[1] === prdCode);
                 if (item) item[4] = newStatus;
                 
@@ -195,7 +160,7 @@ const Data = {
 };
 
 // ==========================================
-// 4. UI MODULE (Render/Interaksi)
+// 5. UI MODULE (Render/Interaksi)
 // ==========================================
 const UI = {
     init() {
@@ -205,10 +170,11 @@ const UI = {
             document.getElementById('dashboardSection').style.display = 'block';
             
             // Set User Info & Role Badge
-            document.getElementById('userDisplay').innerHTML = `${State.user.name.toUpperCase()} <span class="badge bg-secondary ms-2">${State.user.role}</span>`;
+            document.getElementById('userDisplay').innerHTML = `${State.user.name.toUpperCase()} <span class="badge bg-secondary ms-2">${State.user.role.toUpperCase()}</span>`;
             
             // Tampilkan Loading di tabel lalu fetch data
-            document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div></td></tr>`;
+            document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div><br><small class="text-muted">Memuat data...</small></td></tr>`;
+            
             Data.fetchDocuments();
         }
     },
@@ -229,15 +195,18 @@ const UI = {
         }
         emptyState.classList.add('d-none');
 
-        // Paginasi Logic
+        // Logic Paginasi
         const startIndex = (State.pagination.page - 1) * State.pagination.limit;
         const endIndex = startIndex + State.pagination.limit;
         const pageData = State.filteredData.slice(startIndex, endIndex);
 
         pageData.forEach(row => {
+            // Struktur Data dari Spreadsheet: [0]Time, [1]Code, [2]App, [3]User, [4]Status
             const [timestamp, code, app, user, status] = row;
             const dateStr = UI.formatDate(timestamp);
-            const statusBadge = UI.getStatusBadge(status, code);
+            
+            // Render Badge Status (Admin clickable, Staff plain)
+            const statusBadge = UI.getStatusBadge(status || 'Pending', code);
 
             tbody.innerHTML += `
                 <tr>
@@ -262,7 +231,7 @@ const UI = {
         if (State.user && State.user.role === 'admin') {
             return `<span class="badge status-badge ${colorClass} clickable" onclick="UI.promptStatusChange('${prdCode}', '${status}')" title="Klik untuk ubah status">${status}</span>`;
         }
-        // Jika STAFF, badge biasa
+        // Jika STAFF, badge biasa (tidak bisa diklik)
         return `<span class="badge status-badge ${colorClass}">${status}</span>`;
     },
 
@@ -278,7 +247,9 @@ const UI = {
             },
             showCancelButton: true,
             confirmButtonText: 'Simpan',
-            cancelButtonText: 'Batal'
+            cancelButtonText: 'Batal',
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33'
         }).then((result) => {
             if (result.isConfirmed && result.value !== currentStatus) {
                 Data.updateStatus(prdCode, result.value);
@@ -293,14 +264,16 @@ const UI = {
         if (totalPages <= 1) { nav.innerHTML = ''; return; }
 
         let html = '';
-        // Helper function untuk tombol
+        // Helper untuk tombol pagination
         const createBtn = (page, text, active = false, disabled = false) => `
             <li class="page-item ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}">
                 <a class="page-link" href="#" onclick="UI.changePage(${page})">${text}</a>
             </li>`;
 
+        // Tombol Previous
         html += createBtn(State.pagination.page - 1, 'Previous', false, State.pagination.page === 1);
 
+        // Tombol Angka
         for (let i = 1; i <= totalPages; i++) {
             if (i === 1 || i === totalPages || (i >= State.pagination.page - 1 && i <= State.pagination.page + 1)) {
                 html += createBtn(i, i, i === State.pagination.page);
@@ -309,6 +282,7 @@ const UI = {
             }
         }
 
+        // Tombol Next
         html += createBtn(State.pagination.page + 1, 'Next', false, State.pagination.page === totalPages);
         nav.innerHTML = html;
     },
@@ -321,6 +295,7 @@ const UI = {
     },
 
     formatDate(isoString) {
+        if (!isoString) return "-";
         const d = new Date(isoString);
         return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + 
                ', ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
@@ -328,41 +303,42 @@ const UI = {
 };
 
 // ==========================================
-// 5. EVENT LISTENERS (Menghubungkan HTML ke JS)
+// 6. EVENT LISTENERS (Menghubungkan HTML ke JS)
 // ==========================================
 
-// Login Form
+// A. Login Form
 document.getElementById('loginForm').addEventListener('submit', (e) => {
     e.preventDefault();
-    Auth.login(
-        document.getElementById('username').value.trim(), 
-        document.getElementById('password').value
-    );
+    const u = document.getElementById('username').value.trim();
+    const p = document.getElementById('password').value;
+    
+    if(u && p) Auth.login(u, p);
 });
 
-// Add Document Form
+// B. Add Document Form
 document.getElementById('prdForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const modalEl = document.getElementById('addModal');
     const modalInstance = bootstrap.Modal.getInstance(modalEl);
     
-    // Panggil fungsi Data.add
-    const success = await Data.addDocument(
-        document.getElementById('prdNumber').value,
-        document.getElementById('appName').value,
-        document.getElementById('prdStatus').value
-    );
+    const num = document.getElementById('prdNumber').value;
+    const app = document.getElementById('appName').value;
+    const status = document.getElementById('prdStatus').value;
+
+    // Panggil fungsi Data.addDocument
+    const success = await Data.addDocument(num, app, status);
 
     if (success) {
         modalInstance.hide();
-        e.target.reset();
+        e.target.reset(); // Reset form jika berhasil
     }
 });
 
-// Search Input
+// C. Search Input (Realtime Filtering)
 document.getElementById('searchInput').addEventListener('input', (e) => {
     const keyword = e.target.value.toLowerCase();
     
+    // Filter array lokal
     State.filteredData = State.allData.filter(row => {
         // row[1]=Code, row[2]=App, row[3]=User, row[4]=Status
         return (row[1] || '').toLowerCase().includes(keyword) || 
@@ -371,9 +347,12 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
                (row[4] || '').toLowerCase().includes(keyword);
     });
     
-    State.pagination.page = 1;
+    State.pagination.page = 1; // Reset ke halaman 1 hasil pencarian
     UI.renderTable();
 });
 
-// Start App Check
+// ==========================================
+// 7. INITIALIZE APP
+// ==========================================
+// Jalankan pengecekan sesi saat file dimuat
 UI.init();
