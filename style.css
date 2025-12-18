@@ -221,3 +221,116 @@ th.sortable i {
 th.sortable.active i {
     color: #4a90e2; /* Warna biru saat aktif */
 }
+
+/* =========================================
+   MOBILE CARD VIEW (TRANSFORM TABLE TO CARDS)
+   ========================================= */
+
+@media (max-width: 768px) {
+    /* 1. Sembunyikan Header Tabel (Kode, App, Status, dll) */
+    .table thead {
+        display: none;
+    }
+
+    /* 2. Ubah perilaku Tabel menjadi Block (Tumpuk ke bawah) */
+    .table, .table tbody, .table tr, .table td {
+        display: block;
+        width: 100%;
+    }
+
+    /* 3. Styling untuk "Kartu" (Baris Tabel / TR) */
+    .table tbody tr {
+        background-color: #ffffff;
+        border: 1px solid #eef2f7;
+        border-radius: 12px; /* Sudut membulat */
+        box-shadow: 0 4px 10px rgba(0,0,0,0.03); /* Efek bayangan */
+        margin-bottom: 15px; /* Jarak antar kartu */
+        padding: 15px;
+    }
+
+    /* 4. Styling untuk Isi Data (TD) */
+    .table tbody td {
+        text-align: right; /* Data rata kanan */
+        padding: 10px 0;
+        border-bottom: 1px dashed #eee; /* Garis pemisah tipis antar data */
+        position: relative;
+        display: flex;
+        justify-content: space-between; /* Label di kiri, Data di kanan */
+        align-items: center;
+        font-size: 0.9rem;
+    }
+
+    /* Hilangkan garis di item terakhir dalam kartu */
+    .table tbody td:last-child {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+
+    /* Hilangkan padding kiri bawaan bootstrap */
+    .table .ps-4, .table .pe-4 {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* =========================================
+       AUTO LABELS (LABEL OTOMATIS CSS)
+       ========================================= */
+    /* Kita gunakan fitur ::before untuk membuat label palsu 
+       karena header tabel disembunyikan */
+
+    /* Kolom 1: Kode PRD */
+    .table tbody td:nth-child(1)::before {
+        content: "Kode PRD";
+        font-weight: 700;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+    }
+
+    /* Kolom 2: Nama Aplikasi */
+    .table tbody td:nth-child(2)::before {
+        content: "Project";
+        font-weight: 700;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+    }
+    /* Khusus Nama Aplikasi, buat teksnya rata kanan dan bisa turun baris */
+    .table tbody td:nth-child(2) {
+        white-space: normal; 
+        text-align: right;
+        max-width: 100%;
+        font-weight: 600; /* Tebalkan nama aplikasi */
+    }
+
+    /* Kolom 3: Status */
+    .table tbody td:nth-child(3)::before {
+        content: "Status";
+        font-weight: 700;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+    }
+
+    /* Kolom 4: PIC */
+    .table tbody td:nth-child(4)::before {
+        content: "PIC";
+        font-weight: 700;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+    }
+    /* Fix posisi Avatar PIC di mobile */
+    .table tbody td:nth-child(4) {
+        justify-content: space-between;
+    }
+
+    /* Kolom 5: Tanggal */
+    .table tbody td:nth-child(5)::before {
+        content: "Tanggal";
+        font-weight: 700;
+        color: #6c757d;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+    }
+}
