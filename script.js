@@ -131,7 +131,7 @@ const Data = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    action: 'updateStatus', prdCode: prdCode, newStatus: newStatus, role: State.user.role, user: State.user.name 
+                    action: 'updateStatus', prdCode: prdCode, newStatus: newStatus, user: State.user.name 
                 })
             });
             const result = await res.json();
