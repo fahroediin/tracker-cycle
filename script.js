@@ -1,28 +1,32 @@
-/* script.js - Final Version with Avatar & Password Toggle */
+/* script.js - Final Version with Sorting, Avatar & Password Toggle */
 
 // ==========================================
 // 1. KONFIGURASI
 // ==========================================
 const APP_CONFIG = {
-    // Menggunakan Proxy Vercel agar URL Google Script aman/tersembunyi
     API_URL: "/api/proxy"
 };
 
 // ==========================================
-// 2. STATE MANAGEMENT (Penyimpanan Data Lokal)
+// 2. STATE MANAGEMENT
 // ==========================================
 const State = {
-    user: JSON.parse(localStorage.getItem('ba_user_session')) || null, // Simpan Nama & Role
+    user: JSON.parse(localStorage.getItem('ba_user_session')) || null,
     allData: [],
     filteredData: [],
     pagination: {
         page: 1,
         limit: 10
+    },
+    // TAMBAHAN: State untuk Sorting
+    sort: {
+        column: 0, // Default sort berdasarkan Tanggal (Index 0)
+        direction: 'desc' // Default terbaru di atas
     }
 };
 
 // ==========================================
-// 3. AUTH MODULE (Login/Logout)
+// 3. AUTH MODULE
 // ==========================================
 const Auth = {
     async login(username, password) {
@@ -36,7 +40,6 @@ const Auth = {
             const result = await res.json();
             
             if (result.status === 'success') {
-                // Simpan user & role ke localStorage
                 State.user = { name: result.user, role: result.role };
                 localStorage.setItem('ba_user_session', JSON.stringify(State.user));
                 UI.init();
@@ -45,7 +48,7 @@ const Auth = {
             }
         } catch (err) {
             console.error(err);
-            Swal.fire('Error', 'Gagal terhubung ke server (Cek Proxy/Internet)', 'error');
+            Swal.fire('Error', 'Gagal terhubung ke server', 'error');
         }
         UI.loading(false);
     },
@@ -57,26 +60,26 @@ const Auth = {
 };
 
 // ==========================================
-// 4. DATA MODULE (Fetch/Add/Update)
+// 4. DATA MODULE
 // ==========================================
 const Data = {
     async fetchDocuments() {
         try {
-            // Fetch GET ke Proxy
             const res = await fetch(APP_CONFIG.API_URL);
             const data = await res.json();
             
-            // Validasi data
             if (Array.isArray(data)) {
                 State.allData = data;
+                // Saat awal load, reset filter dan apply default sort (Tanggal Desc)
                 State.filteredData = [...State.allData];
+                Data.applySort(); 
                 UI.renderTable();
             } else {
                 throw new Error(data.message || "Format data salah");
             }
         } catch (err) {
             console.error(err);
-            document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Gagal mengambil data. <br><small>${err.message}</small></td></tr>`;
+            document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">Gagal mengambil data.<br><small>${err.message}</small></td></tr>`;
         }
     },
 
@@ -87,25 +90,23 @@ const Data = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    action: 'add', 
-                    prdNumber: num, 
-                    appName: app, 
-                    status: status, 
-                    user: State.user.name 
+                    action: 'add', prdNumber: num, appName: app, status: status, user: State.user.name 
                 })
             });
             const result = await res.json();
 
             if (result.status === 'success') {
                 const d = result.data;
-                // Update optimis ke memori (tambah di paling atas)
                 State.allData.unshift([d.timestamp, d.code, d.appName, d.user, d.status]);
                 
-                // Reset search & filter agar data baru terlihat
                 document.getElementById('searchInput').value = '';
                 State.filteredData = [...State.allData];
-                State.pagination.page = 1;
                 
+                // Reset sort ke default (Tanggal Desc) agar data baru terlihat di atas
+                State.sort = { column: 0, direction: 'desc' };
+                Data.applySort();
+                
+                State.pagination.page = 1;
                 UI.renderTable();
                 Swal.fire('Berhasil', result.message, 'success');
                 return true; 
@@ -122,7 +123,6 @@ const Data = {
     },
 
     async updateStatus(prdCode, newStatus) {
-        // Double check di frontend: Staff tidak boleh update
         if (State.user.role !== 'admin') return;
 
         UI.loading(true);
@@ -131,11 +131,7 @@ const Data = {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    action: 'updateStatus', 
-                    prdCode: prdCode, 
-                    newStatus: newStatus,
-                    role: State.user.role, 
-                    user: State.user.name  // PENTING: Kirim user untuk Audit Trail
+                    action: 'updateStatus', prdCode: prdCode, newStatus: newStatus, role: State.user.role, user: State.user.name 
                 })
             });
             const result = await res.json();
@@ -143,7 +139,6 @@ const Data = {
             if (result.status === 'success') {
                 const item = State.allData.find(row => row[1] === prdCode);
                 if (item) item[4] = newStatus;
-                
                 UI.renderTable(); 
                 Swal.fire('Updated!', 'Status berhasil diubah.', 'success');
             } else {
@@ -154,11 +149,37 @@ const Data = {
         } finally {
             UI.loading(false);
         }
+    },
+
+    // --- LOGIKA SORTING ---
+    applySort() {
+        const colIndex = State.sort.column;
+        const direction = State.sort.direction; // 'asc' or 'desc'
+
+        State.filteredData.sort((a, b) => {
+            let valA = a[colIndex];
+            let valB = b[colIndex];
+
+            // Khusus kolom Tanggal (Index 0)
+            if (colIndex === 0) {
+                valA = new Date(valA).getTime();
+                valB = new Date(valB).getTime();
+            } 
+            // Khusus Kolom String (Code, App, User) -> Case Insensitive
+            else if (typeof valA === 'string') {
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
+            }
+
+            if (valA < valB) return direction === 'asc' ? -1 : 1;
+            if (valA > valB) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
     }
 };
 
 // ==========================================
-// 5. UI MODULE (Render/Interaksi)
+// 5. UI MODULE
 // ==========================================
 const UI = {
     init() {
@@ -175,8 +196,51 @@ const UI = {
         document.getElementById('loading').style.display = show ? 'flex' : 'none';
     },
 
-    // --- FUNGSI RENDER TABLE UTAMA ---
+    // --- HANDLE SORT CLICK ---
+    handleSort(columnIndex) {
+        // Jika klik kolom yang sama, balik arah (asc <-> desc)
+        if (State.sort.column === columnIndex) {
+            State.sort.direction = State.sort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            // Jika klik kolom baru, default ke asc
+            State.sort.column = columnIndex;
+            State.sort.direction = 'asc';
+        }
+
+        // Jalankan sorting
+        Data.applySort();
+        // Render ulang tabel
+        UI.renderTable();
+    },
+
+    // --- UPDATE ICON SORTING ---
+    updateSortIcons() {
+        // Reset semua icon jadi default (fa-sort abu-abu)
+        [0, 1, 2, 3].forEach(idx => {
+            const icon = document.getElementById(`sort-icon-${idx}`);
+            const th = icon.parentElement; // Element <th>
+            
+            if (icon) {
+                icon.className = 'fas fa-sort';
+                th.classList.remove('active');
+            }
+        });
+
+        // Update icon kolom yang aktif
+        const activeCol = State.sort.column;
+        const activeDir = State.sort.direction;
+        const activeIcon = document.getElementById(`sort-icon-${activeCol}`);
+        
+        if (activeIcon) {
+            activeIcon.className = activeDir === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+            activeIcon.parentElement.classList.add('active'); // Tambah warna biru
+        }
+    },
+
     renderTable() {
+        // Update visual icon sorting setiap kali render
+        UI.updateSortIcons();
+
         const tbody = document.getElementById('tableBody');
         const emptyState = document.getElementById('emptyState');
         tbody.innerHTML = '';
@@ -197,8 +261,6 @@ const UI = {
             const [timestamp, code, app, user, status] = row;
             const dateStr = UI.formatDate(timestamp);
             const statusBadge = UI.getStatusBadge(status || 'Pending', code);
-            
-            // Generate Avatar untuk PIC
             const picHTML = UI.getUserAvatarHTML(user);
 
             tbody.innerHTML += `
@@ -206,7 +268,7 @@ const UI = {
                     <td class="ps-4"><span class="badge bg-light text-primary border badge-prd shadow-sm">${code}</span></td>
                     <td class="fw-bold text-dark">${app}</td>
                     <td>${statusBadge}</td>
-                    <td>${picHTML}</td> <!-- Kolom PIC dengan Avatar -->
+                    <td>${picHTML}</td>
                     <td class="text-end pe-4 small text-muted font-monospace">${dateStr}</td>
                 </tr>
             `;
@@ -214,37 +276,20 @@ const UI = {
         UI.renderPagination();
     },
 
-    // --- HELPER: Generate Avatar HTML ---
     getUserAvatarHTML(name) {
         if (!name) return '-';
         const initial = name.charAt(0).toUpperCase();
         const color = UI.getColorFromName(name);
-
-        return `
-            <div class="d-flex align-items-center">
-                <div class="avatar-circle me-2" style="background-color: ${color};">
-                    ${initial}
-                </div>
-                <span class="pic-name">${name}</span>
-            </div>
-        `;
+        return `<div class="d-flex align-items-center"><div class="avatar-circle me-2" style="background-color: ${color};">${initial}</div><span class="pic-name">${name}</span></div>`;
     },
 
-    // --- HELPER: Generate Consistent Color ---
     getColorFromName(name) {
-        const colors = [
-            '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', 
-            '#6610f2', '#fd7e14', '#20c997', '#d63384', '#6f42c1'
-        ];
+        const colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6610f2', '#fd7e14', '#20c997', '#d63384', '#6f42c1'];
         let hash = 0;
-        for (let i = 0; i < name.length; i++) {
-            hash = name.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const index = Math.abs(hash % colors.length);
-        return colors[index];
+        for (let i = 0; i < name.length; i++) { hash = name.charCodeAt(i) + ((hash << 5) - hash); }
+        return colors[Math.abs(hash % colors.length)];
     },
 
-    // --- HELPER: Status Badge ---
     getStatusBadge(status, prdCode) {
         let colorClass = 'bg-secondary';
         if (status === 'On Progress') colorClass = 'bg-primary';
@@ -262,16 +307,10 @@ const UI = {
             title: `Ubah Status ${prdCode}`,
             input: 'select',
             inputValue: currentStatus,
-            inputOptions: {
-                'On Progress': 'On Progress',
-                'Pending': 'Pending',
-                'Done': 'Done'
-            },
+            inputOptions: { 'On Progress': 'On Progress', 'Pending': 'Pending', 'Done': 'Done' },
             showCancelButton: true,
             confirmButtonText: 'Simpan',
-            cancelButtonText: 'Batal',
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33'
+            cancelButtonText: 'Batal'
         }).then((result) => {
             if (result.isConfirmed && result.value !== currentStatus) {
                 Data.updateStatus(prdCode, result.value);
@@ -282,15 +321,14 @@ const UI = {
     renderPagination() {
         const nav = document.getElementById('paginationControls');
         const totalPages = Math.ceil(State.filteredData.length / State.pagination.limit);
-        
         if (totalPages <= 1) { nav.innerHTML = ''; return; }
-
+        
         let html = '';
         const createBtn = (page, text, active = false, disabled = false) => `
             <li class="page-item ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}">
                 <a class="page-link" href="#" onclick="UI.changePage(${page})">${text}</a>
             </li>`;
-
+        
         html += createBtn(State.pagination.page - 1, 'Previous', false, State.pagination.page === 1);
         for (let i = 1; i <= totalPages; i++) {
             if (i === 1 || i === totalPages || (i >= State.pagination.page - 1 && i <= State.pagination.page + 1)) {
@@ -321,8 +359,6 @@ const UI = {
 // ==========================================
 // 6. EVENT LISTENERS
 // ==========================================
-
-// Login
 document.getElementById('loginForm').addEventListener('submit', (e) => {
     e.preventDefault();
     const u = document.getElementById('username').value.trim();
@@ -330,7 +366,6 @@ document.getElementById('loginForm').addEventListener('submit', (e) => {
     if(u && p) Auth.login(u, p);
 });
 
-// Add Document
 document.getElementById('prdForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const modalEl = document.getElementById('addModal');
@@ -341,14 +376,12 @@ document.getElementById('prdForm').addEventListener('submit', async (e) => {
         document.getElementById('appName').value,
         document.getElementById('prdStatus').value
     );
-
     if (success) {
         modalInstance.hide();
         e.target.reset();
     }
 });
 
-// Search
 document.getElementById('searchInput').addEventListener('input', (e) => {
     const keyword = e.target.value.toLowerCase();
     State.filteredData = State.allData.filter(row => {
@@ -357,31 +390,28 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
                (row[3] || '').toLowerCase().includes(keyword) ||
                (row[4] || '').toLowerCase().includes(keyword);
     });
+    
+    // PENTING: Terapkan sort yang sedang aktif pada hasil pencarian
+    Data.applySort(); 
+    
     State.pagination.page = 1; 
     UI.renderTable();
 });
 
 // ==========================================
-// 7. HELPER FUNCTIONS (PASSWORD TOGGLE)
+// 7. HELPER FUNCTIONS
 // ==========================================
-
-// Fungsi ini dipanggil dari HTML onclick="togglePasswordVisibility()"
 function togglePasswordVisibility() {
     const passwordInput = document.getElementById('password');
     const toggleIcon = document.getElementById('toggleIcon');
-
     if (passwordInput.type === 'password') {
         passwordInput.type = 'text';
-        toggleIcon.classList.remove('fa-eye');
-        toggleIcon.classList.add('fa-eye-slash');
-        toggleIcon.classList.remove('text-muted');
-        toggleIcon.classList.add('text-primary'); 
+        toggleIcon.classList.replace('fa-eye', 'fa-eye-slash');
+        toggleIcon.classList.replace('text-muted', 'text-primary');
     } else {
         passwordInput.type = 'password';
-        toggleIcon.classList.remove('fa-eye-slash');
-        toggleIcon.classList.add('fa-eye');
-        toggleIcon.classList.add('text-muted');
-        toggleIcon.classList.remove('text-primary');
+        toggleIcon.classList.replace('fa-eye-slash', 'fa-eye');
+        toggleIcon.classList.replace('text-primary', 'text-muted');
     }
 }
 

@@ -101,15 +101,33 @@
         <div class="card card-custom p-0 overflow-hidden shadow-sm">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4 text-nowrap" width="15%">Kode PRD</th>
-                            <th width="35%">Project</th>
-                            <th class="text-nowrap" width="15%">Status</th>
-                            <th class="text-nowrap" width="20%">PIC</th> 
-                            <th class="text-end pe-4 text-nowrap" width="20%">Tanggal Input</th>
-                        </tr>
-                    </thead>
+                <!-- Di dalam index.html -->
+                <thead class="bg-light">
+                    <tr>
+                        <!-- Index 1: Kode PRD -->
+                        <th class="ps-4 text-nowrap sortable" width="15%" onclick="UI.handleSort(1)">
+                            Kode PRD <i id="sort-icon-1" class="fas fa-sort"></i>
+                        </th>
+                        
+                        <!-- Index 2: Nama Aplikasi -->
+                        <th width="35%" class="sortable" onclick="UI.handleSort(2)">
+                            Nama Aplikasi <i id="sort-icon-2" class="fas fa-sort"></i>
+                        </th>
+                        
+                        <!-- Status (Tidak di-sort sesuai request) -->
+                        <th class="text-nowrap" width="15%">Status</th>
+                        
+                        <!-- Index 3: PIC -->
+                        <th class="text-nowrap sortable" width="20%" onclick="UI.handleSort(3)">
+                            PIC <i id="sort-icon-3" class="fas fa-sort"></i>
+                        </th>
+                        
+                        <!-- Index 0: Tanggal -->
+                        <th class="text-end pe-4 text-nowrap sortable" width="15%" onclick="UI.handleSort(0)">
+                            Tanggal Input <i id="sort-icon-0" class="fas fa-sort"></i>
+                        </th>
+                    </tr>
+                </thead>
                     <tbody id="tableBody"></tbody>
                 </table>
             </div>

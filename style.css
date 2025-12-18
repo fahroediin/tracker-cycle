@@ -200,3 +200,24 @@ body {
     font-size: 0.9rem;
     text-transform: capitalize;
 }
+
+/* Sortable Header Styles */
+th.sortable {
+    cursor: pointer;
+    transition: background-color 0.2s;
+    user-select: none; /* Agar teks tidak terblok saat klik cepat */
+}
+
+th.sortable:hover {
+    background-color: #e2e6ea; /* Efek hover sedikit gelap */
+}
+
+th.sortable i {
+    margin-left: 5px;
+    font-size: 0.8em;
+    color: #adb5bd;
+}
+
+th.sortable.active i {
+    color: #4a90e2; /* Warna biru saat aktif */
+}
