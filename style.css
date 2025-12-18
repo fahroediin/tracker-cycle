@@ -155,3 +155,21 @@ body {
         border-radius: 15px; /* Lebih bulat di mobile */
     }
 }
+
+/* Style Khusus Input Group Password */
+.input-group .form-control:focus {
+    box-shadow: none; /* Hilangkan shadow biru default bootstrap agar rapi */
+    border-color: #dee2e6; /* Tetap abu-abu, atau ganti warna primary jika ingin */
+    border-right: none; /* Hilangkan garis kanan input saat fokus */
+}
+
+/* Pastikan border input dan icon menyatu rapi saat fokus */
+.input-group:focus-within .form-control,
+.input-group:focus-within .input-group-text {
+    border-color: #86b7fe; /* Warna biru fokus bootstrap */
+    z-index: 2;
+}
+
+.input-group-text {
+    transition: all 0.2s;
+}

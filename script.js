@@ -352,7 +352,33 @@ document.getElementById('searchInput').addEventListener('input', (e) => {
 });
 
 // ==========================================
-// 7. INITIALIZE APP
+// 7. HELPER FUNCTIONS
+// ==========================================
+
+// Fungsi Toggle Show/Hide Password
+function togglePasswordVisibility() {
+    const passwordInput = document.getElementById('password');
+    const toggleIcon = document.getElementById('toggleIcon');
+
+    if (passwordInput.type === 'password') {
+        // Ubah jadi Text (Password terlihat)
+        passwordInput.type = 'text';
+        toggleIcon.classList.remove('fa-eye');
+        toggleIcon.classList.add('fa-eye-slash'); // Ikon mata dicoret
+        toggleIcon.classList.remove('text-muted');
+        toggleIcon.classList.add('text-primary'); // Ubah warna jadi biru agar terlihat aktif
+    } else {
+        // Ubah jadi Password (Password tersembunyi)
+        passwordInput.type = 'password';
+        toggleIcon.classList.remove('fa-eye-slash');
+        toggleIcon.classList.add('fa-eye'); // Ikon mata biasa
+        toggleIcon.classList.add('text-muted');
+        toggleIcon.classList.remove('text-primary');
+    }
+}
+
+// ==========================================
+// 8. INITIALIZE APP
 // ==========================================
 // Jalankan pengecekan sesi saat file dimuat
 UI.init();
