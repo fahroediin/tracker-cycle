@@ -45,16 +45,22 @@
         </div>
     </div>
 
-    <!-- Dashboard Section -->
-    <div id="dashboardSection" class="main-container py-5 container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h2 class="fw-bold text-dark"><i class="fas fa-cubes me-2 text-primary"></i>Cycle Tracker</h2>
-                <p class="text-muted mb-0">Login: <span id="userDisplay" class="fw-bold text-primary"></span></p>
+<!-- Dashboard Section -->
+    <div id="dashboardSection" class="main-container py-4 py-md-5 container">
+        
+        <!-- Header: Responsive Flex (Column di HP, Row di Desktop) -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
+            <div class="text-center text-md-start">
+                <h2 class="fw-bold text-dark mb-1"><i class="fas fa-cubes me-2 text-primary"></i>PRD Tracker</h2>
+                <p class="text-muted mb-0 small">
+                    User: <span id="userDisplay" class="fw-bold text-primary"></span>
+                </p>
             </div>
-            <div>
-                <button class="btn btn-primary shadow-sm me-2" data-bs-toggle="modal" data-bs-target="#addModal">
-                    <i class="fas fa-plus me-2"></i> Input Baru
+            
+            <!-- Tombol Action: Full Width di HP -->
+            <div class="d-flex gap-2 w-100 w-md-auto justify-content-center justify-content-md-end">
+                <button class="btn btn-primary shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#addModal">
+                    <i class="fas fa-plus me-2"></i> <span class="d-inline d-md-none">Baru</span><span class="d-none d-md-inline">Input Baru</span>
                 </button>
                 <button class="btn btn-outline-danger" onclick="Auth.logout()" title="Keluar">
                     <i class="fas fa-sign-out-alt"></i>
@@ -62,30 +68,32 @@
             </div>
         </div>
 
-        <!-- Search Bar -->
-        <div class="row mb-3">
-            <div class="col-md-5">
+        <!-- Search Bar: Full Width di HP -->
+        <div class="row mb-3 g-2">
+            <div class="col-12 col-md-5">
                 <div class="input-group shadow-sm">
                     <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Cari Kode, Nama, User, Status...">
+                    <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Cari Kode, App, User...">
                 </div>
             </div>
-            <div class="col-md-7 text-end align-self-center">
-                 <small class="text-muted fst-italic">*Admin dapat klik badge status untuk mengubahnya</small>
+            <div class="col-12 col-md-7 text-center text-md-end align-self-center">
+                 <small class="text-muted fst-italic d-block d-md-inline mt-2 mt-md-0" style="font-size: 0.75rem;">
+                    *Admin: Klik status untuk ubah
+                 </small>
             </div>
         </div>
 
-        <!-- Table -->
-        <div class="card card-custom p-0 overflow-hidden">
+        <!-- Table Card -->
+        <div class="card card-custom p-0 overflow-hidden shadow-sm">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
                     <thead class="bg-light">
                         <tr>
-                            <th class="ps-4" width="15%">Kode PRD</th>
-                            <th width="30%">Nama Aplikasi / Project</th>
+                            <th class="ps-4 text-nowrap" width="15%">Kode</th>
+                            <th width="35%">Aplikasi</th> <!-- Lebar diperbesar utk mobile -->
                             <th width="15%">Status</th>
-                            <th width="15%">Dibuat Oleh</th>
-                            <th width="25%" class="text-end pe-4">Tanggal Input</th>
+                            <th width="15%">User</th>
+                            <th width="20%" class="text-end pe-4 text-nowrap">Tanggal</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
@@ -99,12 +107,11 @@
 
             <div class="p-3 border-top bg-light d-flex justify-content-center">
                 <nav aria-label="Page navigation">
-                    <ul class="pagination pagination-sm mb-0" id="paginationControls"></ul>
+                    <ul class="pagination pagination-sm mb-0 flex-wrap justify-content-center" id="paginationControls"></ul>
                 </nav>
             </div>
         </div>
     </div>
-
     <!-- Modal Input -->
     <div class="modal fade" id="addModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
