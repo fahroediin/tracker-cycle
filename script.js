@@ -1,4 +1,4 @@
-/* script.js - Final Project Management Version */
+/* script.js - Updated Data Fetching */
 
 const APP_CONFIG = { LOGIN_URL: "/api/auth", DATA_URL: "/api/proxy" };
 
@@ -13,7 +13,6 @@ function escapeHtml(text) {
     return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-// --- AUTH ---
 const Auth = {
     async login(u, p) {
         UI.loading(true);
@@ -31,7 +30,6 @@ const Auth = {
     logout() { localStorage.removeItem('ba_user_session'); localStorage.removeItem('ba_token'); location.reload(); }
 };
 
-// --- DATA ---
 async function fetchWithAuth(url, options = {}) {
     if (!options.headers) options.headers = {};
     if (State.token) options.headers['Authorization'] = `Bearer ${State.token}`;
@@ -42,15 +40,29 @@ async function fetchWithAuth(url, options = {}) {
 }
 
 const Data = {
+    // [PERBAIKAN UTAMA DI SINI]
     async fetchDocuments() {
         try {
-            const data = await fetchWithAuth(APP_CONFIG.DATA_URL);
-            if (Array.isArray(data)) {
-                State.allData = data; State.filteredData = [...State.allData];
-                Data.applySort(); UI.renderTable();
+            // Ubah dari GET ke POST dengan action 'getDocuments'
+            const result = await fetchWithAuth(APP_CONFIG.DATA_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'getDocuments' })
+            });
+            
+            // Cek status success dan array data
+            if (result.status === 'success' && Array.isArray(result.data)) {
+                State.allData = result.data; 
+                State.filteredData = [...State.allData];
+                Data.applySort(); 
+                UI.renderTable();
+            } else {
+                throw new Error(result.message || "Format data tidak sesuai");
             }
-        } catch (err) { if (State.token) console.error(err); }
+        } catch (err) { 
+            if (State.token) console.error(err); 
+        }
     },
+
     async addDocument(num, app, status) {
         UI.loading(true);
         try {
@@ -76,10 +88,7 @@ const Data = {
                 const item = State.allData.find(row => row[1] === prdCode);
                 if (item) item[4] = newStatus;
                 Data.refreshLocal();
-                
-                // Refresh Modal Detail if Open
                 UI.openDetailModal(item);
-                
                 Swal.fire('Updated', 'Status berhasil diperbarui.', 'success');
             } else { Swal.fire('Gagal', result.message, 'error'); }
         } catch (err) { Swal.fire('Error', err.message, 'error'); } finally { UI.loading(false); }
@@ -110,7 +119,6 @@ const Data = {
     }
 };
 
-// --- UI ---
 const UI = {
     init() {
         if (State.user && State.token) {
@@ -126,7 +134,6 @@ const UI = {
     },
     loading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; },
     
-    // --- RENDER TABLE ---
     renderTable() {
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = '';
@@ -141,7 +148,6 @@ const UI = {
 
         pageData.forEach(row => {
             const [timestamp, code, app, user, status] = row;
-            // Gunakan array untuk passing data ke onclick
             const rowDataStr = encodeURIComponent(JSON.stringify(row));
             
             tbody.innerHTML += `
@@ -156,7 +162,6 @@ const UI = {
         UI.renderPagination();
     },
 
-    // --- DETAIL & HISTORY MODAL ---
     async handleClickRow(rowDataStr) {
         const rowData = JSON.parse(decodeURIComponent(rowDataStr));
         UI.openDetailModal(rowData);
@@ -164,30 +169,24 @@ const UI = {
 
     async openDetailModal(rowData) {
         const [timestamp, code, app, user, status] = rowData;
-        
         document.getElementById('detailAppName').textContent = app;
         document.getElementById('detailCode').textContent = code;
-        document.getElementById('detailStatusBadge').innerHTML = UI.getStatusBadge(status, true); // true = large badge
+        document.getElementById('detailStatusBadge').innerHTML = UI.getStatusBadge(status, true);
         
-        // Render Action Button based on Role & Status
         const actionContainer = document.getElementById('actionButtonContainer');
         actionContainer.innerHTML = '';
 
         if (State.user.role === 'staff') {
-            // Staff Logic: Hanya bisa submit review jika Open, On Progress, atau Need Revise
             if (['Open', 'On Progress', 'Need Revise'].includes(status)) {
                 actionContainer.innerHTML = `<button class="btn btn-purple text-white btn-sm" onclick="UI.promptStatusChange('${code}', 'Need Review', 'Ajukan Review')"><i class="fas fa-paper-plane me-2"></i>Submit for Review</button>`;
             }
         } else if (State.user.role === 'admin') {
-            // Admin Logic: Bisa ubah ke apa saja
             actionContainer.innerHTML = `<button class="btn btn-outline-primary btn-sm" onclick="UI.adminStatusChange('${code}', '${status}')"><i class="fas fa-edit me-2"></i>Ubah Status</button>`;
         }
 
-        // Show Modal
         const modal = new bootstrap.Modal(document.getElementById('detailModal'));
         modal.show();
 
-        // Fetch & Render History
         const historyContainer = document.getElementById('historyTimeline');
         historyContainer.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Memuat...</div>';
         
@@ -209,33 +208,23 @@ const UI = {
                             <div class="timeline-text">${escapeHtml(h.details)}</div>
                             ${h.comment ? `<div class="timeline-comment"><i class="fas fa-quote-left me-2 text-warning"></i>${escapeHtml(h.comment)}</div>` : ''}
                         </div>
-                    </div>
-                `;
+                    </div>`;
             });
         }
     },
 
-    // --- CHANGE STATUS FLOW ---
     promptStatusChange(prdCode, targetStatus, title) {
         Swal.fire({
             title: title,
             input: 'textarea',
             inputLabel: 'Tuliskan catatan/komentar (Wajib)',
-            inputPlaceholder: 'Contoh: Sudah selesai dikerjakan, mohon dicek...',
+            inputPlaceholder: 'Contoh: Sudah selesai dikerjakan...',
             showCancelButton: true,
             confirmButtonText: 'Kirim',
-            cancelButtonText: 'Batal',
-            preConfirm: (comment) => {
-                if (!comment) Swal.showValidationMessage('Komentar wajib diisi!');
-                return comment;
-            }
+            preConfirm: (c) => { if (!c) Swal.showValidationMessage('Komentar wajib diisi!'); return c; }
         }).then((result) => {
             if (result.isConfirmed) {
-                // Sembunyikan modal detail dulu
-                const modalEl = document.getElementById('detailModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
-                
+                bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
                 Data.updateStatus(prdCode, targetStatus, result.value);
             }
         });
@@ -248,6 +237,7 @@ const UI = {
                 <select id="swal-status" class="form-select mb-3">
                     <option value="Open" ${currentStatus==='Open'?'selected':''}>Open</option>
                     <option value="On Progress" ${currentStatus==='On Progress'?'selected':''}>On Progress</option>
+                    <option value="Need Review" ${currentStatus==='Need Review'?'selected':''}>Need Review</option>
                     <option value="Need Revise" ${currentStatus==='Need Revise'?'selected':''}>Need Revise</option>
                     <option value="Done" ${currentStatus==='Done'?'selected':''}>Done</option>
                 </select>
@@ -263,32 +253,26 @@ const UI = {
             }
         }).then((result) => {
             if (result.isConfirmed) {
-                const modalEl = document.getElementById('detailModal');
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                modal.hide();
+                bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
                 Data.updateStatus(prdCode, result.value.status, result.value.comment);
             }
         });
     },
 
-    // --- HELPERS ---
     getStatusBadge(status, isLarge = false) {
         let cls = 'bg-secondary';
         if (status === 'Open') cls = 'bg-secondary bg-opacity-75';
         else if (status === 'On Progress') cls = 'bg-primary';
-        else if (status === 'Need Review') cls = 'bg-info text-dark'; // Ungu/Biru muda
+        else if (status === 'Need Review') cls = 'bg-info text-dark';
         else if (status === 'Need Revise') cls = 'bg-warning text-dark';
         else if (status === 'Done') cls = 'bg-success';
-        
         const sizeCls = isLarge ? 'fs-6 px-3 py-2' : 'status-badge';
         return `<span class="badge ${cls} ${sizeCls}">${escapeHtml(status)}</span>`;
     },
     getUserAvatarHTML(name) {
         if (!name) return '-';
         const initial = name.charAt(0).toUpperCase();
-        // Hashing warna
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        let hash = 0; for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
         const colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
         const color = colors[Math.abs(hash % colors.length)];
         return `<div class="d-flex align-items-center"><div class="avatar-circle me-2" style="background-color: ${color};">${initial}</div><span class="pic-name">${escapeHtml(name)}</span></div>`;
@@ -303,7 +287,7 @@ const UI = {
         else { State.sort.column = idx; State.sort.direction = 'asc'; }
         Data.applySort(); UI.renderTable();
     },
-    renderPagination() { /* ... Logic pagination sama spt sebelumnya ... */ 
+    renderPagination() { 
         const total = Math.ceil(State.filteredData.length / State.pagination.limit);
         const nav = document.getElementById('paginationControls'); nav.innerHTML = '';
         if(total<=1) return;
@@ -311,7 +295,6 @@ const UI = {
     }
 };
 
-// --- EVENTS ---
 document.getElementById('loginForm').addEventListener('submit', (e) => { e.preventDefault(); Auth.login(document.getElementById('username').value, document.getElementById('password').value); });
 document.getElementById('prdForm').addEventListener('submit', async (e) => { e.preventDefault(); const m=bootstrap.Modal.getInstance(document.getElementById('addModal')); if(await Data.addDocument(document.getElementById('prdNumber').value, document.getElementById('appName').value, document.getElementById('prdStatus').value)) { m.hide(); e.target.reset(); } });
 document.getElementById('searchInput').addEventListener('input', (e) => { const k=e.target.value.toLowerCase(); State.filteredData=State.allData.filter(r=>r.some(v=>String(v).toLowerCase().includes(k))); Data.applySort(); UI.renderTable(); });
