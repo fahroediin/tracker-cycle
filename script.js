@@ -230,7 +230,11 @@ const UI = {
         });
     },
 
-    adminStatusChange(prdCode, currentStatus) {
+adminStatusChange(prdCode, currentStatus) {
+        // [FIX] Matikan enforce focus bootstrap sementara
+        const modalEl = document.getElementById('detailModal');
+        modalEl.removeAttribute('tabindex'); 
+
         Swal.fire({
             title: 'Ubah Status',
             html: `
@@ -241,24 +245,41 @@ const UI = {
                     <option value="Need Revise" ${currentStatus==='Need Revise'?'selected':''}>Need Revise</option>
                     <option value="Done" ${currentStatus==='Done'?'selected':''}>Done</option>
                 </select>
-                <textarea id="swal-comment" class="form-control" placeholder="Komentar (Wajib)"></textarea>
+                <textarea id="swal-comment" class="form-control" placeholder="Komentar (Wajib ditulis)..."></textarea>
             `,
             showCancelButton: true,
             confirmButtonText: 'Simpan',
+            cancelButtonText: 'Batal',
+            // [FIX] Pastikan fokus masuk ke input saat popup muncul
+            didOpen: () => {
+                document.getElementById('swal-comment').focus();
+            },
             preConfirm: () => {
                 const status = document.getElementById('swal-status').value;
                 const comment = document.getElementById('swal-comment').value;
-                if (!comment) Swal.showValidationMessage('Komentar wajib diisi!');
+                
+                // Validasi Komentar Wajib
+                if (!comment) {
+                    Swal.showValidationMessage('Komentar wajib diisi!');
+                    return false;
+                }
                 return { status, comment };
             }
         }).then((result) => {
+            // [FIX] Kembalikan tabindex (opsional)
+            modalEl.setAttribute('tabindex', '-1');
+
             if (result.isConfirmed) {
-                bootstrap.Modal.getInstance(document.getElementById('detailModal')).hide();
+                // Tutup modal detail
+                const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                modalInstance.hide();
+                
+                // Kirim data
                 Data.updateStatus(prdCode, result.value.status, result.value.comment);
             }
         });
     },
-
+    
     getStatusBadge(status, isLarge = false) {
         let cls = 'bg-secondary';
         if (status === 'Open') cls = 'bg-secondary bg-opacity-75';
