@@ -334,3 +334,72 @@ th.sortable.active i {
         font-size: 0.75rem;
     }
 }
+
+/* ... CSS sebelumnya ... */
+
+/* TIMELINE STYLES */
+.timeline {
+    position: relative;
+    padding-left: 20px;
+    border-left: 2px solid #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 25px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -26px; /* Adjust dot position */
+    top: 5px;
+    width: 14px;
+    height: 14px;
+    background-color: #fff;
+    border: 3px solid #4a90e2;
+    border-radius: 50%;
+}
+
+.timeline-date {
+    font-size: 0.75rem;
+    color: #adb5bd;
+    margin-bottom: 4px;
+}
+
+.timeline-content {
+    background: #fff;
+    padding: 12px 15px;
+    border-radius: 8px;
+    border: 1px solid #f1f3f5;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.timeline-user {
+    font-weight: 700;
+    color: #343a40;
+    font-size: 0.9rem;
+}
+
+.timeline-text {
+    font-size: 0.9rem;
+    color: #495057;
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+.timeline-comment {
+    margin-top: 8px;
+    padding: 8px;
+    background-color: #f8f9fa;
+    border-left: 3px solid #ffc107;
+    font-size: 0.85rem;
+    font-style: italic;
+    color: #555;
+    border-radius: 0 4px 4px 0;
+}
+
+/* Cursor pointer untuk baris tabel agar terlihat bisa diklik */
+.table tbody tr {
+    cursor: pointer;
+}

@@ -4,23 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cycle Tracker System</title>
-    <!-- Library Eksternal -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Link CSS Lokal -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- Loading Overlay -->
     <div id="loading" class="loading-overlay">
-        <div class="spinner-border text-primary mb-3" style="width: 3rem; height: 3rem;"></div>
+        <div class="spinner-border text-primary mb-3"></div>
         <h5 class="fw-bold text-secondary">Memproses data...</h5>
     </div>
 
-    <!-- Login Section -->
+    <!-- LOGIN -->
     <div id="loginSection" class="login-container">
         <div class="card login-card p-4">
             <div class="text-center mb-4">
@@ -30,165 +26,125 @@
                 <h4 class="fw-bold">Login BA Team</h4>
             </div>
             <form id="loginForm">
-                <div class="mb-3">
-                    <label class="fw-bold small mb-1">Username</label>
-                    <input type="text" id="username" class="form-control" placeholder="username" required>
-                </div>
-                
-                <!-- Input Password dengan Toggle Show/Hide -->
+                <div class="mb-3"><label class="fw-bold small">Username</label><input type="text" id="username" class="form-control" required></div>
                 <div class="mb-4">
-                    <label class="fw-bold small mb-1">Password</label>
+                    <label class="fw-bold small">Password</label>
                     <div class="input-group">
-                        <!-- Input Password -->
-                        <input type="password" id="password" class="form-control border-end-0" placeholder="••••••" required>
-                        
-                        <!-- Tombol Mata (Eye Icon) -->
-                        <span class="input-group-text bg-white border-start-0" style="cursor: pointer;" onclick="togglePasswordVisibility()">
-                            <i id="toggleIcon" class="fas fa-eye text-muted"></i>
-                        </span>
+                        <input type="password" id="password" class="form-control border-end-0" required>
+                        <span class="input-group-text bg-white border-start-0 cursor-pointer" onclick="togglePasswordVisibility()"><i id="toggleIcon" class="fas fa-eye text-muted"></i></span>
                     </div>
                 </div>
-
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary py-2 fw-bold">MASUK</button>
-                </div>
+                <div class="d-grid"><button type="submit" class="btn btn-primary fw-bold">MASUK</button></div>
             </form>
         </div>
     </div>
 
-    <!-- Dashboard Section -->
+    <!-- DASHBOARD -->
     <div id="dashboardSection" class="main-container py-4 py-md-5 container">
-        
-        <!-- Header: Responsive Flex (Column di HP, Row di Desktop) -->
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-4 gap-3">
             <div class="text-center text-md-start">
                 <h2 class="fw-bold text-dark mb-1"><i class="fas fa-cubes me-2 text-primary"></i>Cycle Tracker</h2>
-                <p class="text-muted mb-0 small">
-                    Login: <span id="userDisplay" class="fw-bold text-primary"></span>
-                </p>
+                <p class="text-muted mb-0 small">Login: <span id="userDisplay" class="fw-bold text-primary"></span></p>
             </div>
-            
-            <!-- Tombol Action -->
             <div class="d-flex gap-2 w-100 w-md-auto justify-content-center justify-content-md-end">
                 <button class="btn btn-primary shadow-sm flex-grow-1 flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#addModal">
-                    <i class="fas fa-plus me-2"></i> 
-                    <!-- Teks berubah pendek di HP -->
-                    <span class="d-inline d-md-none">Baru</span>
-                    <span class="d-none d-md-inline">Input Baru</span>
+                    <i class="fas fa-plus me-2"></i> <span class="d-none d-md-inline">Project Baru</span><span class="d-md-none">Baru</span>
                 </button>
-                <button class="btn btn-outline-danger" onclick="Auth.logout()" title="Keluar">
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
+                <button class="btn btn-outline-danger" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i></button>
             </div>
         </div>
 
-        <!-- Search Bar -->
         <div class="row mb-3 g-2">
             <div class="col-12 col-md-5">
                 <div class="input-group shadow-sm">
                     <span class="input-group-text bg-white border-end-0"><i class="fas fa-search text-muted"></i></span>
-                    <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Cari Kode, Nama, User, Status...">
+                    <input type="text" id="searchInput" class="form-control border-start-0" placeholder="Cari Project...">
                 </div>
             </div>
             <div class="col-12 col-md-7 text-center text-md-end align-self-center">
-                 <small class="text-muted fst-italic d-block d-md-inline mt-2 mt-md-0" style="font-size: 0.8rem;">
-                    *Admin dapat klik badge status untuk mengubahnya
-                 </small>
+                 <small class="text-muted fst-italic" style="font-size: 0.8rem;">*Klik baris/kartu untuk melihat Detail & History</small>
             </div>
         </div>
 
-        <!-- Table Card -->
         <div class="card card-custom p-0 overflow-hidden shadow-sm">
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0">
-                <!-- Di dalam index.html -->
-                <thead class="bg-light">
-                    <tr>
-                        <!-- Index 1: Kode PRD -->
-                        <th class="ps-4 text-nowrap sortable" width="15%" onclick="UI.handleSort(1)">
-                            Kode PRD <i id="sort-icon-1" class="fas fa-sort"></i>
-                        </th>
-                        
-                        <!-- Index 2: Nama Aplikasi -->
-                        <th width="35%" class="sortable" onclick="UI.handleSort(2)">
-                            Nama Aplikasi <i id="sort-icon-2" class="fas fa-sort"></i>
-                        </th>
-                        
-                        <!-- Status (Tidak di-sort sesuai request) -->
-                        <th class="text-nowrap" width="15%">Status</th>
-                        
-                        <!-- Index 3: PIC -->
-                        <th class="text-nowrap sortable" width="20%" onclick="UI.handleSort(3)">
-                            PIC <i id="sort-icon-3" class="fas fa-sort"></i>
-                        </th>
-                        
-                        <!-- Index 0: Tanggal -->
-                        <th class="text-end pe-4 text-nowrap sortable" width="15%" onclick="UI.handleSort(0)">
-                            Tanggal Input <i id="sort-icon-0" class="fas fa-sort"></i>
-                        </th>
-                    </tr>
-                </thead>
+                    <thead class="bg-light">
+                        <tr>
+                            <th class="ps-4 text-nowrap sortable" width="15%" onclick="UI.handleSort(1)">Kode <i id="sort-1" class="fas fa-sort"></i></th>
+                            <th width="35%" class="sortable" onclick="UI.handleSort(2)">Aplikasi <i id="sort-2" class="fas fa-sort"></i></th>
+                            <th class="text-nowrap" width="15%">Status</th>
+                            <th class="text-nowrap sortable" width="15%" onclick="UI.handleSort(3)">PIC <i id="sort-3" class="fas fa-sort"></i></th>
+                            <th class="text-end pe-4 text-nowrap sortable" width="20%" onclick="UI.handleSort(0)">Tanggal <i id="sort-0" class="fas fa-sort"></i></th>
+                        </tr>
+                    </thead>
                     <tbody id="tableBody"></tbody>
                 </table>
             </div>
-            
-            <div id="emptyState" class="text-center py-5 d-none">
-                <i class="fas fa-folder-open fa-3x text-muted mb-3 opacity-50"></i>
-                <p class="text-muted">Data tidak ditemukan.</p>
-            </div>
-
-            <div class="p-3 border-top bg-light d-flex justify-content-center">
-                <nav aria-label="Page navigation">
-                    <ul class="pagination pagination-sm mb-0 flex-wrap justify-content-center" id="paginationControls"></ul>
-                </nav>
-            </div>
+            <div id="emptyState" class="text-center py-5 d-none"><p class="text-muted">Data tidak ditemukan.</p></div>
+            <div class="p-3 border-top bg-light d-flex justify-content-center"><nav><ul class="pagination pagination-sm mb-0" id="paginationControls"></ul></nav></div>
         </div>
     </div>
 
-    <!-- Modal Input -->
+    <!-- MODAL INPUT -->
     <div class="modal fade" id="addModal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content border-0">
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold">Input PRD Baru</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
+                <div class="modal-header bg-light"><h5 class="modal-title fw-bold">Project Baru</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
                 <div class="modal-body p-4">
                     <form id="prdForm">
-                        <div class="mb-3">
-                            <label class="fw-bold form-label">Nomor Dokumen</label>
-                            <div class="input-group">
-                                <span class="input-group-text bg-light fw-bold text-muted">PRD-</span>
-                                <input type="number" id="prdNumber" class="form-control" placeholder="001" required>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="fw-bold form-label">Nama Aplikasi</label>
-                            <input type="text" id="appName" class="form-control" placeholder="Contoh: Mobile Banking" required>
-                        </div>
-                        <div class="mb-3" id="statusInputContainer">
-                            <label class="fw-bold form-label">Status Pengerjaan</label>
+                        <div class="mb-3"><label class="fw-bold form-label">Nomor Dokumen</label><div class="input-group"><span class="input-group-text bg-light fw-bold text-muted">PRD-</span><input type="number" id="prdNumber" class="form-control" placeholder="001" required></div></div>
+                        <div class="mb-3"><label class="fw-bold form-label">Nama Aplikasi</label><input type="text" id="appName" class="form-control" required></div>
+                        <div class="mb-3" id="statusInputContainer" style="display:none;">
+                            <label class="fw-bold form-label">Status Awal</label>
                             <select id="prdStatus" class="form-select">
-                                <option value="On Progress" selected>On Progress</option>
-                                <option value="Pending">Pending</option>
-                                <option value="Done">Done</option>
+                                <option value="Open" selected>Open</option>
+                                <option value="On Progress">On Progress</option>
                             </select>
                         </div>
-                        <div class="d-grid mt-4">
-                            <button type="submit" class="btn btn-primary btn-lg">Simpan Dokumen</button>
-                        </div>
+                        <div class="d-grid mt-4"><button type="submit" class="btn btn-primary">Simpan</button></div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Scripts Library -->
+    <!-- MODAL DETAIL & HISTORY -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0">
+                <div class="modal-header bg-white border-bottom-0">
+                    <h5 class="modal-title fw-bold text-primary"><i class="fas fa-info-circle me-2"></i>Detail Project</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div class="p-4 bg-light">
+                        <h4 class="fw-bold mb-1" id="detailAppName">Loading...</h4>
+                        <span class="badge bg-secondary mb-3" id="detailCode">PRD-XXX</span>
+                        <div class="d-flex justify-content-between align-items-center mt-2 p-3 bg-white rounded shadow-sm">
+                            <div>
+                                <small class="text-muted d-block">Status Saat Ini</small>
+                                <div id="detailStatusBadge"></div>
+                            </div>
+                            <div id="actionButtonContainer">
+                                <!-- Tombol Action akan muncul di sini sesuai Role & Status -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="p-4">
+                        <h6 class="fw-bold text-muted mb-3">Riwayat Pengerjaan (Audit Trail)</h6>
+                        <div class="timeline" id="historyTimeline">
+                            <!-- Timeline items injected here -->
+                            <div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Memuat riwayat...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
-    <!-- Link Script Lokal -->
     <script src="script.js"></script>
-
 </body>
 </html>

@@ -1,451 +1,320 @@
-/* script.js - Final Secure Version (JWT + Avatar + Sort + Password Toggle) */
+/* script.js - Final Project Management Version */
 
-// ==========================================
-// 1. KONFIGURASI
-// ==========================================
-const APP_CONFIG = {
-    LOGIN_URL: "/api/auth",  // Endpoint khusus untuk Login (Create Session)
-    DATA_URL: "/api/proxy"   // Endpoint data yang dilindungi Token (Verify Session)
-};
+const APP_CONFIG = { LOGIN_URL: "/api/auth", DATA_URL: "/api/proxy" };
 
-// ==========================================
-// 2. STATE MANAGEMENT
-// ==========================================
 const State = {
-    // Ambil Token dan User dari LocalStorage
     token: localStorage.getItem('ba_token') || null, 
     user: JSON.parse(localStorage.getItem('ba_user_session')) || null,
-    
-    allData: [],
-    filteredData: [],
-    pagination: { page: 1, limit: 10 },
-    sort: { column: 0, direction: 'desc' } // Default sort: Tanggal Terbaru
+    allData: [], filteredData: [], pagination: { page: 1, limit: 10 }, sort: { column: 0, direction: 'desc' }
 };
 
-// ==========================================
-// 3. AUTH MODULE (Login/Logout)
-// ==========================================
+function escapeHtml(text) {
+    if (!text) return "";
+    return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+// --- AUTH ---
 const Auth = {
-    async login(username, password) {
+    async login(u, p) {
         UI.loading(true);
         try {
-            // [CREATE SESSION] Request ke /api/auth
-            const res = await fetch(APP_CONFIG.LOGIN_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
+            const res = await fetch(APP_CONFIG.LOGIN_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username: u, password: p }) });
             const result = await res.json();
-            
             if (result.status === 'success') {
-                // Simpan Token (Sesi) dan Info User
-                State.token = result.token;
-                State.user = { name: result.user, role: result.role };
-                
-                localStorage.setItem('ba_token', result.token);
-                localStorage.setItem('ba_user_session', JSON.stringify(State.user));
-                
+                State.token = result.token; State.user = { name: result.user, role: result.role };
+                localStorage.setItem('ba_token', result.token); localStorage.setItem('ba_user_session', JSON.stringify(State.user));
                 UI.init();
-            } else {
-                Swal.fire('Login Gagal', result.message, 'error');
-            }
-        } catch (err) {
-            console.error(err);
-            Swal.fire('Error', 'Gagal terhubung ke server', 'error');
-        }
+            } else { Swal.fire('Login Gagal', result.message, 'error'); }
+        } catch (err) { Swal.fire('Error', 'Gagal koneksi server', 'error'); }
         UI.loading(false);
     },
-
-    logout() {
-        // [DESTROY SESSION] Hapus token dari browser
-        localStorage.removeItem('ba_user_session');
-        localStorage.removeItem('ba_token'); 
-        location.reload();
-    }
+    logout() { localStorage.removeItem('ba_user_session'); localStorage.removeItem('ba_token'); location.reload(); }
 };
 
-// ==========================================
-// 4. DATA MODULE (Fetch/Add/Update)
-// ==========================================
-
-// [VERIFY SESSION HELPER]
-// Fungsi ini menempelkan Token ke setiap request
+// --- DATA ---
 async function fetchWithAuth(url, options = {}) {
     if (!options.headers) options.headers = {};
-    
-    // Tempelkan Token JWT di Header
-    if (State.token) {
-        options.headers['Authorization'] = `Bearer ${State.token}`;
-    }
+    if (State.token) options.headers['Authorization'] = `Bearer ${State.token}`;
     options.headers['Content-Type'] = 'application/json';
-
     const res = await fetch(url, options);
-    
-    // Jika Server menolak token (401/403), paksa Logout
-    if (res.status === 401 || res.status === 403) {
-        Auth.logout();
-        throw new Error("Sesi kadaluarsa atau tidak valid.");
-    }
-    
+    if (res.status === 401 || res.status === 403) { Auth.logout(); throw new Error("Sesi habis."); }
     return res.json();
 }
 
 const Data = {
     async fetchDocuments() {
         try {
-            // Gunakan fetchWithAuth untuk akses data aman
             const data = await fetchWithAuth(APP_CONFIG.DATA_URL);
-            
             if (Array.isArray(data)) {
-                State.allData = data;
-                State.filteredData = [...State.allData];
-                Data.applySort(); // Terapkan sorting default
-                UI.renderTable();
-            } else {
-                throw new Error(data.message || "Gagal memuat data");
+                State.allData = data; State.filteredData = [...State.allData];
+                Data.applySort(); UI.renderTable();
             }
-        } catch (err) {
-            console.error(err);
-            // Jangan tampilkan error jika token kosong (karena akan redirect ke login)
-            if (State.token) {
-                document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center text-danger py-4">${err.message}</td></tr>`;
-            }
-        }
+        } catch (err) { if (State.token) console.error(err); }
     },
-
     async addDocument(num, app, status) {
         UI.loading(true);
         try {
             const result = await fetchWithAuth(APP_CONFIG.DATA_URL, {
                 method: 'POST',
-                body: JSON.stringify({ 
-                    action: 'add', prdNumber: num, appName: app, status: status 
-                    // Note: 'user' diambil otomatis dari token di server
-                })
+                body: JSON.stringify({ action: 'add', prdNumber: num, appName: app, status: status })
             });
-
             if (result.status === 'success') {
                 const d = result.data;
                 State.allData.unshift([d.timestamp, d.code, d.appName, d.user, d.status]);
-                
-                document.getElementById('searchInput').value = '';
-                State.filteredData = [...State.allData];
-                
-                // Reset sort agar data baru terlihat di atas
-                State.sort = { column: 0, direction: 'desc' };
-                Data.applySort();
-                
-                State.pagination.page = 1;
-                UI.renderTable();
-                Swal.fire('Berhasil', result.message, 'success');
-                return true; 
-            } else {
-                Swal.fire('Gagal', result.message, 'error');
-                return false;
-            }
-        } catch (err) {
-            Swal.fire('Error', 'Gagal menyimpan data', 'error');
-            return false;
-        } finally {
-            UI.loading(false);
-        }
+                Data.refreshLocal(); return true; 
+            } else { Swal.fire('Gagal', result.message, 'error'); return false; }
+        } catch (err) { Swal.fire('Error', err.message, 'error'); return false; } finally { UI.loading(false); }
     },
-
-    async updateStatus(prdCode, newStatus) {
-        if (State.user.role !== 'admin') return;
-
+    async updateStatus(prdCode, newStatus, comment) {
         UI.loading(true);
         try {
             const result = await fetchWithAuth(APP_CONFIG.DATA_URL, {
                 method: 'POST',
-                body: JSON.stringify({ 
-                    action: 'updateStatus', prdCode: prdCode, newStatus: newStatus 
-                })
+                body: JSON.stringify({ action: 'updateStatus', prdCode, newStatus, comment })
             });
-
             if (result.status === 'success') {
                 const item = State.allData.find(row => row[1] === prdCode);
                 if (item) item[4] = newStatus;
-                UI.renderTable(); 
-                Swal.fire('Updated!', 'Status berhasil diubah.', 'success');
-            } else {
-                Swal.fire('Gagal', result.message, 'error');
-            }
-        } catch (err) {
-            Swal.fire('Error', 'Gagal update status', 'error');
-        } finally {
-            UI.loading(false);
-        }
+                Data.refreshLocal();
+                
+                // Refresh Modal Detail if Open
+                UI.openDetailModal(item);
+                
+                Swal.fire('Updated', 'Status berhasil diperbarui.', 'success');
+            } else { Swal.fire('Gagal', result.message, 'error'); }
+        } catch (err) { Swal.fire('Error', err.message, 'error'); } finally { UI.loading(false); }
     },
-
-    // --- LOGIKA SORTING ---
+    async getHistory(prdCode) {
+        try {
+            const result = await fetchWithAuth(APP_CONFIG.DATA_URL, {
+                method: 'POST',
+                body: JSON.stringify({ action: 'getHistory', prdCode })
+            });
+            return result.data || [];
+        } catch (e) { return []; }
+    },
+    refreshLocal() {
+        document.getElementById('searchInput').value = '';
+        State.filteredData = [...State.allData];
+        Data.applySort();
+        UI.renderTable();
+    },
     applySort() {
-        const colIndex = State.sort.column;
-        const direction = State.sort.direction; 
-
+        const {column, direction} = State.sort;
         State.filteredData.sort((a, b) => {
-            let valA = a[colIndex];
-            let valB = b[colIndex];
-
-            // Kolom Tanggal (Index 0)
-            if (colIndex === 0) {
-                valA = new Date(valA).getTime();
-                valB = new Date(valB).getTime();
-            } 
-            // Kolom String
-            else if (typeof valA === 'string') {
-                valA = valA.toLowerCase();
-                valB = valB.toLowerCase();
-            }
-
-            if (valA < valB) return direction === 'asc' ? -1 : 1;
-            if (valA > valB) return direction === 'asc' ? 1 : -1;
-            return 0;
+            let valA = a[column], valB = b[column];
+            if (column === 0) { valA = new Date(valA).getTime(); valB = new Date(valB).getTime(); }
+            else if (typeof valA === 'string') { valA = valA.toLowerCase(); valB = valB.toLowerCase(); }
+            return (valA < valB ? -1 : 1) * (direction === 'asc' ? 1 : -1);
         });
     }
 };
 
-// ==========================================
-// 5. UI MODULE
-// ==========================================
+// --- UI ---
 const UI = {
     init() {
-        // Cek apakah ada User DAN Token
         if (State.user && State.token) {
             document.getElementById('loginSection').style.display = 'none';
             document.getElementById('dashboardSection').style.display = 'block';
-            document.getElementById('userDisplay').innerHTML = `${State.user.name.toUpperCase()} <span class="badge bg-secondary ms-2">${State.user.role.toUpperCase()}</span>`;
-            
-            // Logic Sembunyikan Input Status untuk Staff
-            const statusContainer = document.getElementById('statusInputContainer');
-            if (statusContainer) {
-                if (State.user.role === 'admin') {
-                    statusContainer.style.display = 'block';
-                } else {
-                    statusContainer.style.display = 'none';
-                    document.getElementById('prdStatus').value = 'On Progress';
-                }
+            document.getElementById('userDisplay').innerHTML = `${escapeHtml(State.user.name)} <span class="badge bg-secondary">${State.user.role}</span>`;
+            if(document.getElementById('statusInputContainer')) {
+                document.getElementById('statusInputContainer').style.display = State.user.role === 'admin' ? 'block' : 'none';
+                document.getElementById('prdStatus').value = 'Open';
             }
-
-            document.getElementById('tableBody').innerHTML = `<tr><td colspan="5" class="text-center py-5"><div class="spinner-border text-primary"></div><br><small class="text-muted">Memuat data...</small></td></tr>`;
             Data.fetchDocuments();
         }
     },
-
-    loading(show) {
-        document.getElementById('loading').style.display = show ? 'flex' : 'none';
-    },
-
-    // --- SORTING HANDLER ---
-    handleSort(columnIndex) {
-        if (State.sort.column === columnIndex) {
-            State.sort.direction = State.sort.direction === 'asc' ? 'desc' : 'asc';
-        } else {
-            State.sort.column = columnIndex;
-            State.sort.direction = 'asc';
-        }
-        Data.applySort();
-        UI.renderTable();
-    },
-
-    updateSortIcons() {
-        [0, 1, 2, 3].forEach(idx => {
-            const icon = document.getElementById(`sort-icon-${idx}`);
-            if (icon) {
-                icon.className = 'fas fa-sort';
-                icon.parentElement.classList.remove('active');
-            }
-        });
-        const activeCol = State.sort.column;
-        const activeDir = State.sort.direction;
-        const activeIcon = document.getElementById(`sort-icon-${activeCol}`);
-        if (activeIcon) {
-            activeIcon.className = activeDir === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
-            activeIcon.parentElement.classList.add('active');
-        }
-    },
-
+    loading(show) { document.getElementById('loading').style.display = show ? 'flex' : 'none'; },
+    
     // --- RENDER TABLE ---
     renderTable() {
-        UI.updateSortIcons(); // Update ikon panah sort
-
         const tbody = document.getElementById('tableBody');
-        const emptyState = document.getElementById('emptyState');
         tbody.innerHTML = '';
-
         if (State.filteredData.length === 0) {
-            emptyState.classList.remove('d-none');
-            document.getElementById('paginationControls').innerHTML = '';
-            return;
+            document.getElementById('emptyState').classList.remove('d-none');
+            document.getElementById('paginationControls').innerHTML = ''; return;
         }
-        emptyState.classList.add('d-none');
-
-        const startIndex = (State.pagination.page - 1) * State.pagination.limit;
-        const endIndex = startIndex + State.pagination.limit;
-        const pageData = State.filteredData.slice(startIndex, endIndex);
+        document.getElementById('emptyState').classList.add('d-none');
+        
+        const start = (State.pagination.page - 1) * State.pagination.limit;
+        const pageData = State.filteredData.slice(start, start + State.pagination.limit);
 
         pageData.forEach(row => {
             const [timestamp, code, app, user, status] = row;
-            const dateStr = UI.formatDate(timestamp);
-            const statusBadge = UI.getStatusBadge(status || 'Pending', code);
-            const picHTML = UI.getUserAvatarHTML(user);
-
+            // Gunakan array untuk passing data ke onclick
+            const rowDataStr = encodeURIComponent(JSON.stringify(row));
+            
             tbody.innerHTML += `
-                <tr>
-                    <td class="ps-4"><span class="badge bg-light text-primary border badge-prd shadow-sm">${code}</span></td>
-                    <td class="fw-bold text-dark">${app}</td>
-                    <td>${statusBadge}</td>
-                    <td>${picHTML}</td>
-                    <td class="text-end pe-4 small text-muted font-monospace">${dateStr}</td>
-                </tr>
-            `;
+                <tr onclick="UI.handleClickRow('${rowDataStr}')">
+                    <td class="ps-4"><span class="badge bg-light text-primary border">${escapeHtml(code)}</span></td>
+                    <td class="fw-bold">${escapeHtml(app)}</td>
+                    <td>${UI.getStatusBadge(status)}</td>
+                    <td>${UI.getUserAvatarHTML(user)}</td>
+                    <td class="text-end pe-4 small text-muted">${UI.formatDate(timestamp)}</td>
+                </tr>`;
         });
         UI.renderPagination();
     },
 
-    // --- AVATAR & COLOR ---
-    getUserAvatarHTML(name) {
-        if (!name) return '-';
-        const initial = name.charAt(0).toUpperCase();
-        const color = UI.getColorFromName(name);
-        return `<div class="d-flex align-items-center"><div class="avatar-circle me-2" style="background-color: ${color};">${initial}</div><span class="pic-name">${name}</span></div>`;
+    // --- DETAIL & HISTORY MODAL ---
+    async handleClickRow(rowDataStr) {
+        const rowData = JSON.parse(decodeURIComponent(rowDataStr));
+        UI.openDetailModal(rowData);
     },
 
-    getColorFromName(name) {
-        const colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6610f2', '#fd7e14', '#20c997', '#d63384', '#6f42c1'];
-        let hash = 0;
-        for (let i = 0; i < name.length; i++) { hash = name.charCodeAt(i) + ((hash << 5) - hash); }
-        return colors[Math.abs(hash % colors.length)];
-    },
+    async openDetailModal(rowData) {
+        const [timestamp, code, app, user, status] = rowData;
+        
+        document.getElementById('detailAppName').textContent = app;
+        document.getElementById('detailCode').textContent = code;
+        document.getElementById('detailStatusBadge').innerHTML = UI.getStatusBadge(status, true); // true = large badge
+        
+        // Render Action Button based on Role & Status
+        const actionContainer = document.getElementById('actionButtonContainer');
+        actionContainer.innerHTML = '';
 
-    // --- STATUS BADGE ---
-    getStatusBadge(status, prdCode) {
-        let colorClass = 'bg-secondary';
-        if (status === 'On Progress') colorClass = 'bg-primary';
-        else if (status === 'Done') colorClass = 'bg-success';
-        else if (status === 'Pending') colorClass = 'bg-warning text-dark';
-
-        if (State.user && State.user.role === 'admin') {
-            return `<span class="badge status-badge ${colorClass} clickable" onclick="UI.promptStatusChange('${prdCode}', '${status}')" title="Klik untuk ubah status">${status}</span>`;
+        if (State.user.role === 'staff') {
+            // Staff Logic: Hanya bisa submit review jika Open, On Progress, atau Need Revise
+            if (['Open', 'On Progress', 'Need Revise'].includes(status)) {
+                actionContainer.innerHTML = `<button class="btn btn-purple text-white btn-sm" onclick="UI.promptStatusChange('${code}', 'Need Review', 'Ajukan Review')"><i class="fas fa-paper-plane me-2"></i>Submit for Review</button>`;
+            }
+        } else if (State.user.role === 'admin') {
+            // Admin Logic: Bisa ubah ke apa saja
+            actionContainer.innerHTML = `<button class="btn btn-outline-primary btn-sm" onclick="UI.adminStatusChange('${code}', '${status}')"><i class="fas fa-edit me-2"></i>Ubah Status</button>`;
         }
-        return `<span class="badge status-badge ${colorClass}">${status}</span>`;
+
+        // Show Modal
+        const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+        modal.show();
+
+        // Fetch & Render History
+        const historyContainer = document.getElementById('historyTimeline');
+        historyContainer.innerHTML = '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Memuat...</div>';
+        
+        const history = await Data.getHistory(code);
+        historyContainer.innerHTML = '';
+        
+        if(history.length === 0) {
+            historyContainer.innerHTML = '<p class="text-muted text-center small">Belum ada riwayat.</p>';
+        } else {
+            history.forEach(h => {
+                historyContainer.innerHTML += `
+                    <div class="timeline-item">
+                        <div class="timeline-date">${UI.formatDate(h.timestamp)}</div>
+                        <div class="timeline-content">
+                            <div class="d-flex justify-content-between">
+                                <span class="timeline-user">${escapeHtml(h.user)}</span>
+                                <small class="text-muted">${escapeHtml(h.activity)}</small>
+                            </div>
+                            <div class="timeline-text">${escapeHtml(h.details)}</div>
+                            ${h.comment ? `<div class="timeline-comment"><i class="fas fa-quote-left me-2 text-warning"></i>${escapeHtml(h.comment)}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        }
     },
 
-    promptStatusChange(prdCode, currentStatus) {
+    // --- CHANGE STATUS FLOW ---
+    promptStatusChange(prdCode, targetStatus, title) {
         Swal.fire({
-            title: `Ubah Status ${prdCode}`,
-            input: 'select',
-            inputValue: currentStatus,
-            inputOptions: { 'On Progress': 'On Progress', 'Pending': 'Pending', 'Done': 'Done' },
+            title: title,
+            input: 'textarea',
+            inputLabel: 'Tuliskan catatan/komentar (Wajib)',
+            inputPlaceholder: 'Contoh: Sudah selesai dikerjakan, mohon dicek...',
             showCancelButton: true,
-            confirmButtonText: 'Simpan',
+            confirmButtonText: 'Kirim',
             cancelButtonText: 'Batal',
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33'
+            preConfirm: (comment) => {
+                if (!comment) Swal.showValidationMessage('Komentar wajib diisi!');
+                return comment;
+            }
         }).then((result) => {
-            if (result.isConfirmed && result.value !== currentStatus) {
-                Data.updateStatus(prdCode, result.value);
+            if (result.isConfirmed) {
+                // Sembunyikan modal detail dulu
+                const modalEl = document.getElementById('detailModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+                
+                Data.updateStatus(prdCode, targetStatus, result.value);
             }
         });
     },
 
-    // --- PAGINATION ---
-    renderPagination() {
-        const nav = document.getElementById('paginationControls');
-        const totalPages = Math.ceil(State.filteredData.length / State.pagination.limit);
-        if (totalPages <= 1) { nav.innerHTML = ''; return; }
-        
-        let html = '';
-        const createBtn = (page, text, active = false, disabled = false) => `
-            <li class="page-item ${active ? 'active' : ''} ${disabled ? 'disabled' : ''}">
-                <a class="page-link" href="#" onclick="UI.changePage(${page})">${text}</a>
-            </li>`;
-        
-        html += createBtn(State.pagination.page - 1, 'Previous', false, State.pagination.page === 1);
-        for (let i = 1; i <= totalPages; i++) {
-            if (i === 1 || i === totalPages || (i >= State.pagination.page - 1 && i <= State.pagination.page + 1)) {
-                html += createBtn(i, i, i === State.pagination.page);
-            } else if (i === State.pagination.page - 2 || i === State.pagination.page + 2) {
-                html += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
+    adminStatusChange(prdCode, currentStatus) {
+        Swal.fire({
+            title: 'Ubah Status',
+            html: `
+                <select id="swal-status" class="form-select mb-3">
+                    <option value="Open" ${currentStatus==='Open'?'selected':''}>Open</option>
+                    <option value="On Progress" ${currentStatus==='On Progress'?'selected':''}>On Progress</option>
+                    <option value="Need Revise" ${currentStatus==='Need Revise'?'selected':''}>Need Revise</option>
+                    <option value="Done" ${currentStatus==='Done'?'selected':''}>Done</option>
+                </select>
+                <textarea id="swal-comment" class="form-control" placeholder="Komentar (Wajib)"></textarea>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Simpan',
+            preConfirm: () => {
+                const status = document.getElementById('swal-status').value;
+                const comment = document.getElementById('swal-comment').value;
+                if (!comment) Swal.showValidationMessage('Komentar wajib diisi!');
+                return { status, comment };
             }
-        }
-        html += createBtn(State.pagination.page + 1, 'Next', false, State.pagination.page === totalPages);
-        nav.innerHTML = html;
+        }).then((result) => {
+            if (result.isConfirmed) {
+                const modalEl = document.getElementById('detailModal');
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                modal.hide();
+                Data.updateStatus(prdCode, result.value.status, result.value.comment);
+            }
+        });
     },
 
-    changePage(page) {
-        const totalPages = Math.ceil(State.filteredData.length / State.pagination.limit);
-        if (page < 1 || page > totalPages) return;
-        State.pagination.page = page;
-        UI.renderTable();
+    // --- HELPERS ---
+    getStatusBadge(status, isLarge = false) {
+        let cls = 'bg-secondary';
+        if (status === 'Open') cls = 'bg-secondary bg-opacity-75';
+        else if (status === 'On Progress') cls = 'bg-primary';
+        else if (status === 'Need Review') cls = 'bg-info text-dark'; // Ungu/Biru muda
+        else if (status === 'Need Revise') cls = 'bg-warning text-dark';
+        else if (status === 'Done') cls = 'bg-success';
+        
+        const sizeCls = isLarge ? 'fs-6 px-3 py-2' : 'status-badge';
+        return `<span class="badge ${cls} ${sizeCls}">${escapeHtml(status)}</span>`;
     },
-
-    formatDate(isoString) {
-        if (!isoString) return "-";
-        const d = new Date(isoString);
-        return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) + 
-               ', ' + d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }).replace('.', ':');
+    getUserAvatarHTML(name) {
+        if (!name) return '-';
+        const initial = name.charAt(0).toUpperCase();
+        // Hashing warna
+        let hash = 0;
+        for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+        const colors = ['#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', '#e74a3b', '#6f42c1'];
+        const color = colors[Math.abs(hash % colors.length)];
+        return `<div class="d-flex align-items-center"><div class="avatar-circle me-2" style="background-color: ${color};">${initial}</div><span class="pic-name">${escapeHtml(name)}</span></div>`;
+    },
+    formatDate(iso) {
+        if (!iso) return "-";
+        const d = new Date(iso);
+        return d.toLocaleDateString('id-ID', {day:'numeric', month:'short'}) + ', ' + d.toLocaleTimeString('id-ID', {hour:'2-digit', minute:'2-digit'});
+    },
+    handleSort(idx) {
+        if(State.sort.column === idx) State.sort.direction = State.sort.direction === 'asc' ? 'desc' : 'asc';
+        else { State.sort.column = idx; State.sort.direction = 'asc'; }
+        Data.applySort(); UI.renderTable();
+    },
+    renderPagination() { /* ... Logic pagination sama spt sebelumnya ... */ 
+        const total = Math.ceil(State.filteredData.length / State.pagination.limit);
+        const nav = document.getElementById('paginationControls'); nav.innerHTML = '';
+        if(total<=1) return;
+        for(let i=1; i<=total; i++) nav.innerHTML += `<li class="page-item ${State.pagination.page===i?'active':''}"><a class="page-link" href="#" onclick="State.pagination.page=${i}; UI.renderTable()">${i}</a></li>`;
     }
 };
 
-// ==========================================
-// 6. EVENT LISTENERS
-// ==========================================
-document.getElementById('loginForm').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const u = document.getElementById('username').value.trim();
-    const p = document.getElementById('password').value;
-    if(u && p) Auth.login(u, p);
-});
+// --- EVENTS ---
+document.getElementById('loginForm').addEventListener('submit', (e) => { e.preventDefault(); Auth.login(document.getElementById('username').value, document.getElementById('password').value); });
+document.getElementById('prdForm').addEventListener('submit', async (e) => { e.preventDefault(); const m=bootstrap.Modal.getInstance(document.getElementById('addModal')); if(await Data.addDocument(document.getElementById('prdNumber').value, document.getElementById('appName').value, document.getElementById('prdStatus').value)) { m.hide(); e.target.reset(); } });
+document.getElementById('searchInput').addEventListener('input', (e) => { const k=e.target.value.toLowerCase(); State.filteredData=State.allData.filter(r=>r.some(v=>String(v).toLowerCase().includes(k))); Data.applySort(); UI.renderTable(); });
+function togglePasswordVisibility() { const p = document.getElementById('password'); const i = document.getElementById('toggleIcon'); if(p.type==='password'){p.type='text';i.className='fas fa-eye-slash text-primary'}else{p.type='password';i.className='fas fa-eye text-muted'} }
 
-document.getElementById('prdForm').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const modalEl = document.getElementById('addModal');
-    const modalInstance = bootstrap.Modal.getInstance(modalEl);
-    
-    const success = await Data.addDocument(
-        document.getElementById('prdNumber').value,
-        document.getElementById('appName').value,
-        document.getElementById('prdStatus').value
-    );
-
-    if (success) {
-        modalInstance.hide();
-        e.target.reset();
-    }
-});
-
-document.getElementById('searchInput').addEventListener('input', (e) => {
-    const keyword = e.target.value.toLowerCase();
-    State.filteredData = State.allData.filter(row => {
-        return (row[1] || '').toLowerCase().includes(keyword) || 
-               (row[2] || '').toLowerCase().includes(keyword) || 
-               (row[3] || '').toLowerCase().includes(keyword) ||
-               (row[4] || '').toLowerCase().includes(keyword);
-    });
-    Data.applySort(); 
-    State.pagination.page = 1; 
-    UI.renderTable();
-});
-
-// ==========================================
-// 7. HELPER FUNCTIONS
-// ==========================================
-function togglePasswordVisibility() {
-    const passwordInput = document.getElementById('password');
-    const toggleIcon = document.getElementById('toggleIcon');
-    if (passwordInput.type === 'password') {
-        passwordInput.type = 'text';
-        toggleIcon.classList.replace('fa-eye', 'fa-eye-slash');
-        toggleIcon.classList.replace('text-muted', 'text-primary');
-    } else {
-        passwordInput.type = 'password';
-        toggleIcon.classList.replace('fa-eye-slash', 'fa-eye');
-        toggleIcon.classList.replace('text-primary', 'text-muted');
-    }
-}
-
-// ==========================================
-// 8. INITIALIZE APP
-// ==========================================
 UI.init();
